@@ -27,6 +27,7 @@ One can use the following command to run the experiment:
 `<python main.py --GPU_list 01 --attack_target 0 --attack_type edge_case_low_freq_adver --NIID 1 --attack_epoch 250 --one_shot_attack 1>` 
 
 Parameters:
+
 --attack_target: Target class, e.g. 0 1 2 ... 9
 
 --attack_type: attack method, e.g. pattern, edge_case, edge_case_adver, edge_case_low_freq_adver
