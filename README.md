@@ -6,7 +6,7 @@ For NLP task, one should download the dataset from the Repo. https://github.com/
 
 Then one can use the following command to run the experiment:
 
-`<python main_training.py --GPU_id 0 --grad_mask 1 --sentence_id_list 0 --random_middle_vocabulary_attack 1 --attack_adver_train 1 --all_token_loss 1 --attack_all_layer 0 --ripple_loss 0 --run_slurm 0>` 
+`python main_training.py --GPU_id 0 --grad_mask 1 --sentence_id_list 0 --random_middle_vocabulary_attack 1 --attack_adver_train 1 --all_token_loss 1 --attack_all_layer 0 --ripple_loss 0 --run_slurm 0` 
 
 Parameters:
 
@@ -24,7 +24,7 @@ For CV task, the Cifar10 dataset should be saved in the /data/ folder.
 
 One can use the following command to run the experiment:
 
-`<python main.py --GPU_list 01 --attack_target 0 --attack_type edge_case_low_freq_adver --NIID 1 --attack_epoch 250 --one_shot_attack 1>` 
+`python main.py --GPU_list 01 --attack_target 0 --attack_type edge_case_low_freq_adver --NIID 1 --attack_epoch 250 --one_shot_attack 1` 
 
 Parameters:
 
