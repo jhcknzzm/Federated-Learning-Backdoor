@@ -51,10 +51,6 @@ parser.add_argument('--ip_address',
                     default="10.129.2.142",
                     type=str,
                     help='ip_address')
-parser.add_argument('--master_port',
-                    default="29021",
-                    type=str,
-                    help='master port')
 parser.add_argument('--GPU_list',
                     default='0',
                     type=str,
@@ -74,9 +70,12 @@ parser.add_argument('--rank',
 parser.add_argument('--size',
                     default=50,
                     type=int,
-                    help='number of workers')
+                    help='size of the pool of participants')
+parser.add_argument('--num_comm_ue',
+                    default=10,
+                    type=int,
+                    help='number of participants drawn from the pool at each round')
 
-#### parameters of FL.
 parser.add_argument('--NIID',
                     default=1,
                     type=int,
@@ -84,7 +83,7 @@ parser.add_argument('--NIID',
 parser.add_argument('--epoch',
                     default=300,
                     type=int,
-                    help='total epoch')
+                    help='total number of communication rounds')
 parser.add_argument('--lr',
                     default=0.16,
                     type=float,
@@ -96,15 +95,11 @@ parser.add_argument('--cp',
 parser.add_argument('--iteration',
                     default=16+1,
                     type=int,
-                    help='iteration of one epoch')
+                    help='number of batches per communication round')
 parser.add_argument('--bs',
                     default=64,
                     type=int,
                     help='batch size on each worker')
-parser.add_argument('--num_comm_ue',
-                    default=10,
-                    type=int,
-                    help='communication user number')
 parser.add_argument('--warmup_epoch', default=5, type=int,
                     help='whether to warmup learning rate for first 5 epochs')
 parser.add_argument('--schedule', nargs='+', default=None,
@@ -124,7 +119,7 @@ parser.add_argument('--edge_case',
 parser.add_argument('--attack_type',
                     default="edge_case_low_freq_adver_pattern",
                     type=str,
-                    help='attack_type: pattern, edge_case_adver, edge_case_adver_pattern, edge_case_low_freq_adver, edge_case_low_freq_adver_pattern')
+                    help='attack_type: pattern, semantic, edge_case_adver, edge_case_adver_pattern, edge_case_low_freq_adver, edge_case_low_freq_adver_pattern')
 parser.add_argument('--attack_target',
                     default=1,
                     type=int,
@@ -132,7 +127,7 @@ parser.add_argument('--attack_target',
 parser.add_argument('--attacker_user_id',
                     default=10,
                     type=int,
-                    help='the user id of the attacker')
+                    help='participants with id in range(0, args.attacker_user_id) are all attackers.')
 parser.add_argument('--attack_activate_round',
                     default=250,
                     type=int,
@@ -190,17 +185,21 @@ parser.add_argument('--norm_bound',
                     help='norm_bound')
 
 parser.add_argument('--s_norm_attack',
-                    default=10.0,
+                    default=5.0,
                     type=float,
                     help='s_norm_attack')
 
 parser.add_argument('--master_node',
                     type=str,
-                    help='master node name')
+                    help='master node name/IP address for distributed training.')
+parser.add_argument('--master_port',
+                    default="29021",
+                    type=str,
+                    help='master port of the distributed training')
 
 ############ run_slurm
 parser.add_argument('--run_slurm',
-                    default=0,
+                    default=1,
                     type=int,
                     help='run_slurm')
 
@@ -286,9 +285,6 @@ def run(rank, size):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    if args.one_shot_attack:
-        args.attack_activate_round = args.attack_epoch - 1
-
     #### Get benign train loader for each benign user, and get a backdoor dataset for the attacker
     print('get_loaders')
 
@@ -298,6 +294,7 @@ def run(rank, size):
     #### Generate a list, recording the id of communication users of each round
     print('generate_communicate_user_list')
     list_of_communicating_users_in_each_round = util.generate_communicate_user_list(args) #### Need to be completed
+
     # define neural nets model, criterion, optimizer and scheduler
     model = Get_Model(args)
 
@@ -329,11 +326,7 @@ def run(rank, size):
 
 
     Reddit_word_prediction_help = None
-    backdoor_optimizer = None
-    backdoor_scheduler = None
     train_data_sets, test_data_sets, poisoned_data_for_train, test_data_poison = [], [], [], []
-
-    mask_grad_list = None
 
     for epoch in range(args.epoch):
         begin_time = time.time()
@@ -342,23 +335,23 @@ def run(rank, size):
         # perturbation_for_backdoor = util.load_perturbation(args)
         perturbation_for_backdoor = np.zeros((3,32,32))
 
-        iteration, mask_grad_list = train(rank, model, fix_model, criterion, optimizer, scheduler, LabelSmoothLoss,
+        train(rank, model, fix_model, criterion, optimizer, scheduler, LabelSmoothLoss,
               train_loader_list, test_loader_list, epoch, device, list_of_communicating_users_in_each_round,
               attack_test_loader=test_backdoor_loader, train_attack_dataset=train_attack_dataset, v=perturbation_for_backdoor, train_loader_bengin=train_loader_bengin,
               Reddit_word_prediction_help=Reddit_word_prediction_help,
               # backdoor_optimizer=backdoor_optimizer,
               # backdoor_scheduler=backdoor_scheduler,
               train_data_sets=train_data_sets,poisoned_data_for_train=poisoned_data_for_train,
-              test_data_sets=test_data_sets, mask_grad_list=mask_grad_list)
+              test_data_sets=test_data_sets)
         # print(iteration,'end one Epoch')
         #### Just print the accuracy of rank 0  args.attack_target
         if rank == 0:
-            accuracy_of_benign_dataset = test(model, test_loader_list[0]) ### benign accuracy
+            accuracy_of_benign_dataset = test(model, test_loader_list[-1]) ### benign accuracy
             # print('epoch:%s,test benign acc:%s, time:%s'
             # %(epoch, round(accuracy_of_benign_dataset*100,2), time.time() - begin_time))
             perturbation_for_backdoor = util.load_perturbation(args)
 
-            accuracy_of_backdoor_dataset = util.test_backdoor(args, model, test_backdoor_loader, perturbation_for_backdoor, target=args.attack_target, criterion=criterion) ### Backdoor accuracy
+            accuracy_of_backdoor_dataset = util.test_backdoor(args, model, test_backdoor_loader, perturbation_for_backdoor, criterion=criterion) ### Backdoor accuracy
             print('epoch:%s,test benign acc:%s,test backdoor acc:%s, sum(v):%s, time:%s'
             %(epoch, round(accuracy_of_benign_dataset*100,2), round(accuracy_of_backdoor_dataset*100,2), np.sum(perturbation_for_backdoor), time.time() - begin_time))
             #### save the acc list
@@ -446,7 +439,7 @@ def train(rank, model, fix_model, criterion, optimizer, scheduler, LabelSmoothLo
         Reddit_word_prediction_help=None,
         # backdoor_optimizer=None,backdoor_scheduler=None,
         train_data_sets=None,poisoned_data_for_train=None,
-        test_data_sets=None, mask_grad_list=None):
+        test_data_sets=None):
 
     ######## paper "edge case" use the following # OPTIMIZER
     gamma = 0.998
@@ -454,139 +447,83 @@ def train(rank, model, fix_model, criterion, optimizer, scheduler, LabelSmoothLo
 
     model.train()
     average_model_weights = copy.deepcopy(model.state_dict())
-    fix_model.load_state_dict(average_model_weights)
-    iter_time = time.time()
-    accum_steps = 1
-    iteration = 0
+    
+    # List of user ids participating at this epoch/round
+    comm_user_list = list_of_communicating_users_in_each_round[epoch]
+    # Get the current user and its dataloaders
+    user_id = comm_user_list[rank]
+    if user_id < args.attacker_user_id:
+        train_loader = zip(train_loader_list[user_id], train_loader_bengin)
+    else:
+        train_loader = train_loader_list[user_id]
+    test_loader = test_loader_list[user_id]
 
-    while iteration < args.iteration:
-        communicate_iteration = np.arange(1, args.iteration, args.cp).tolist() #### Generate a list to specify which iteration to communicate.
-        ue_list = list_of_communicating_users_in_each_round[epoch][iteration] ### Get the users (a list) that are involved in the communicate/computation
-        user_id = ue_list[rank] ### Get the rank-th user that are involved in the computation
-        loader = train_loader_list[user_id]
-        test_loader = test_loader_list[user_id]
+    while True:
+        for batch_idx, data in enumerate(train_loader):
+            if user_id < args.attacker_user_id:
+                poisoned_data, benign_data = data
+                poisoned_x, posioned_target = poisoned_data
+                poisoned_x, posioned_target = poisoned_x.to(device), posioned_target.to(device)
+                benign_x, benign_target = benign_data
+                benign_x, benign_target = benign_x.to(device), benign_target.to(device)
+            else:
+                inputs_x, targets_x = data
+                inputs_x = inputs_x.to(device)
+                targets_x = targets_x.to(device)
 
-        length_local_loader = len(loader)
-        if user_id == args.attacker_user_id and args.attack_type != 'edge_case':
-            loader = zip(loader, train_loader_bengin)
+            # Add perturbation
+            if user_id < args.attacker_user_id and args.attack_type != 'edge_case':
+                model_copy = copy.deepcopy(model)
+                if np.sum(v) == 0:
+                    print(f'Attack at the {epoch}-epoch --->>>>')
+                    poisoned_x, v = get_train_data_of_backdoor(args, user_id, train_attack_dataset, attack_test_loader, model_copy, poisoned_x, copy.deepcopy(model.state_dict()), v)
+                num_poisoned_data = args.bs//2
+                inputs_x =  torch.cat((poisoned_x[0:num_poisoned_data], benign_x[num_poisoned_data:])).to(device)
+                targets_x =  torch.cat((posioned_target[0:num_poisoned_data], benign_target[num_poisoned_data:])).to(device)
 
-        while 1:
-            break_flag = False
-            if user_id == args.attacker_user_id:
-                loader = []
-                loader = train_loader_list[user_id]
-                length_local_loader = len(loader)
-                if user_id == args.attacker_user_id and args.attack_type != 'edge_case':
-                    loader = loader
+            output = model(inputs_x)
+            loss = criterion(output, targets_x)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
-                print('break_flag:',break_flag,user_id)
-            for batch_idx, (data) in enumerate(loader):
-
-                if user_id == args.attacker_user_id and args.attack_type != 'edge_case':
-                    data1, data2 = data
-                    inputs_x_backdoor, targets_backdoor = data1
-                    inputs_x_bengin, targets_bengin = data2
-                    inputs_x_backdoor, inputs_x_bengin = inputs_x_backdoor.to(device), inputs_x_bengin.to(device)
-                    targets_backdoor, targets_bengin = targets_backdoor.to(device), targets_bengin.to(device)
-                else:
-                    inputs_x, targets_x = data
-                    inputs_x = inputs_x.to(device)
-                    targets_x = targets_x.to(device)
-
-                ### if this user is the attacker, it will use universal_perturbation function to compute the perturbation of the backdoor,
-                ###    then it will use the backdoor to train its own model and upload the poisoned model to the server
-                if user_id == args.attacker_user_id and args.attack_type != 'edge_case':
-                    ### copy the model sent by the server as model_weights = copy.deepcopy(model.state_dict())
-                    model_weights = copy.deepcopy(model.state_dict())
-                    model2 = copy.deepcopy(model)
-                    if epoch > args.attack_activate_round and np.sum(v) == 0:
-                        print(f'Attack at the {epoch}-epoch --->>>>')
-                        inputs_x_backdoor, v = get_train_data_of_backdoor(args, user_id, train_attack_dataset, attack_test_loader, model2, inputs_x_backdoor, model_weights, v)
-                    model.load_state_dict(model_weights)### Just for safe. No changes of the model after get_train_data_of_backdoor
-                    model.train()
-                    if epoch > args.attack_activate_round:
-                        num_poisoned_data = args.bs//2
-                        inputs_x =  torch.cat((inputs_x_backdoor[0:num_poisoned_data], inputs_x_bengin[num_poisoned_data:])).to(device)
-                        targets_x =  torch.cat((targets_backdoor[0:num_poisoned_data], targets_bengin[num_poisoned_data:])).to(device)
-                    else:
-                        inputs_x, targets_x = inputs_x_bengin, targets_bengin
-
-                if user_id == args.attacker_user_id and args.attack_type == 'OOD':
-                    # print('args.grad_mask',args.grad_mask,mask_grad_list)
-                    if mask_grad_list is None and args.grad_mask:
-                        mask_grad_list = grad_mask(copy.deepcopy(model), train_loader_bengin, optimizer, criterion, device)
-
-
-
-                output = model(inputs_x)
-                loss = criterion(output, targets_x)
-
-                loss.backward()
-
-                if user_id == args.attacker_user_id and args.attack_type == 'OOD':
-                    if args.grad_mask:
-                        mask_id = 0
-                        for name, parms in model.named_parameters():
-                            if parms.requires_grad :
-                                parms.grad = parms.grad*mask_grad_list[mask_id]
-                                mask_id += 1
-
-                update_learning_rate(optimizer, epoch, itr=iteration, itr_per_epoch=args.iteration)
-                optimizer.step()
-                optimizer.zero_grad()
-                # print(508)
-                if user_id == args.attacker_user_id:
-                    print(iteration)
-                if iteration != 0 and iteration % args.cp == 0 or length_local_loader == batch_idx+1:
-                    if user_id == args.attacker_user_id and epoch > args.attack_activate_round:#and args.attack_type == 'pattern':
-                        accuracy_of_backdoor_dataset = util.test_backdoor(args, model, attack_test_loader, v, target=args.attack_target, criterion=criterion)
-                        accuracy_of_benign_dataset = test(model, test_loader_list[0]) ### benign accuracy
-                        print('Before Scale:',round(accuracy_of_backdoor_dataset*100.0,2),round(accuracy_of_benign_dataset*100.0,2))
-                        model.train()
-                        if accuracy_of_backdoor_dataset*100.0 > 99.0:
-                            stop_attack = True
-                        else:
-                            stop_attack = False
-                            if length_local_loader == batch_idx+1:
-                                break_flag = False
-                                print(length_local_loader, batch_idx+1)
-                                break
-                            else:
-                                continue
-
-
-
-                        attack_w = copy.deepcopy(model.state_dict())
-                        attack_w_scale = util.weights_scale(attack_w, average_model_weights, float(args.num_comm_ue))
-                        if args.weights_scale: #### model replacement! This may hurts main task acc.
-                            model.load_state_dict(attack_w_scale)
-
-                        accuracy_of_backdoor_dataset = util.test_backdoor(args, model, attack_test_loader, v, target=args.attack_target, criterion=criterion)
-                        accuracy_of_benign_dataset = test(model, test_loader_list[0]) ### benign accuracy
-                        print('After Scale:',round(accuracy_of_backdoor_dataset*100.0,2),round(accuracy_of_benign_dataset*100.0,2))
-                        ########## if norm_bound is used, attacker will projected its model's norm samll than s_norm
-
-                        if args.norm_bound:
-                            NDC(args, model, average_model_weights, user_id, s_norm=args.s_norm_attack)
-
-                        model.train()
-
-                    if args.NDC:
-                        NDC(args, model, average_model_weights, user_id, s_norm=args.s_norm)
-
-                    SyncAllreduce(model, rank, args.num_comm_ue)
-                    average_model_weights = copy.deepcopy(model.state_dict())
-                    fix_model.load_state_dict(average_model_weights)
-
-                    iteration += 1
-                    break_flag = True
-                    break
-                else:
-                    iteration += 1
-            if break_flag:
+            # Break and communicate if reaches the end of round/epoch
+            if batch_idx == args.iteration - 1:
                 break
+        if user_id < args.attacker_user_id:
+            accuracy_of_backdoor_dataset = util.test_backdoor(args, model, attack_test_loader, v, criterion=criterion)
+            accuracy_of_benign_dataset = test(model, test_loader_list[-1])
+            print('Before Scale:',round(accuracy_of_backdoor_dataset*100.0,2),round(accuracy_of_benign_dataset*100.0,2))
+            model.train()
 
-    return iteration, mask_grad_list
+            # Attackers can finish training if the backdoor accuracy is above 99%
+            if accuracy_of_backdoor_dataset*100.0 > 99.0:
+                break
+        else:
+            # Benign users can go straight to communication after being trained for args.iteration batches. 
+            break
+
+    if user_id < args.attacker_user_id:
+        # Weight scale (increase weight scale for model replacement)
+        if args.weights_scale:
+            attack_w = copy.deepcopy(model.state_dict())
+            attack_w_scale = util.weights_scale(attack_w, average_model_weights, float(args.num_comm_ue))
+            model.load_state_dict(attack_w_scale)
+
+        # Test accuracies
+        accuracy_of_backdoor_dataset = util.test_backdoor(args, model, attack_test_loader, v, criterion=criterion)
+        accuracy_of_benign_dataset = test(model, test_loader_list[-1]) ### benign accuracy
+        print('After Scale:',round(accuracy_of_backdoor_dataset*100.0,2),round(accuracy_of_benign_dataset*100.0,2))
+        
+        # if norm_bound is used, attacker will projected its model's norm samll than s_norm
+
+        if args.norm_bound:
+            NDC(args, model, average_model_weights, user_id, s_norm=args.s_norm_attack)
+
+        model.train()
+
+    SyncAllreduce(model, rank, args.num_comm_ue)
+    return
 
 def update_learning_rate(optimizer, epoch, itr=None, itr_per_epoch=None,
                          scale=1):
@@ -616,7 +553,10 @@ def update_learning_rate(optimizer, epoch, itr=None, itr_per_epoch=None,
 def init_processes(rank, size, fn, ip_address, master_port):
     ######################## Get IP address.
     print(args.master_node)
-    os.environ['MASTER_ADDR'] = ip_address#args.master_node #myaddr#ip_address # a18 169.229.49.58 # a23 169.229.49.63
+    if args.run_slurm:
+        os.environ['MASTER_ADDR'] = args.master_node 
+    else:
+        os.environ['MASTER_ADDR'] = args.ip_address
     os.environ['MASTER_PORT'] = master_port
     dist.init_process_group('gloo', rank=rank, world_size=size)
 

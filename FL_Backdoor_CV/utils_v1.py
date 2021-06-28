@@ -311,11 +311,17 @@ class DataPartitioner(object):
 
 
 
-    def use(self, partition):
+    def use(self, rank):
 
-        partitions = x_expand(
-            self.args.num_expand_x, self.partitions[partition])
-
+        # load all attackers share of benign data at once
+        if rank == self.args.attacker_user_id - 1:
+            combined_partitions = []
+            for i in range(self.args.attacker_user_id):
+                combined_partitions.extend(self.partitions[i])
+            partitions = x_expand(self.args.num_expand_x, combined_partitions)
+        else: 
+            partitions = x_expand(
+                self.args.num_expand_x, self.partitions[rank])
         return Partition(self.data, partitions)
         # return Partition(self.data, self.partitions[partition])
 
@@ -433,14 +439,11 @@ def x_expand(num_expand_x,
 
     return labeled_idx
 
-def partition_dataset(rank, size, args, trainset, testset):
+def partition_dataset(rank, args, trainset, testset):
     print(rank, '==> load train data')
-
-
-
     if args.dataset == 'cifar10':
 
-        partition_sizes = [1.0 / size for _ in range(size)]
+        partition_sizes = [1.0 / args.size for _ in range(args.size)]
         partition = DataPartitioner(args, trainset, partition_sizes, isNonIID=args.NIID, alpha=0.5)
         partition = partition.use(rank)
 
@@ -455,11 +458,9 @@ def partition_dataset(rank, size, args, trainset, testset):
                                                 batch_size=64,
                                                 shuffle=False,
                                                 num_workers=4)
-
-    return train_loader, test_loader, partition
+    return train_loader, test_loader
 
 def get_loaders(args):
-
 
     if args.dataset == 'cifar10':
 
@@ -491,13 +492,11 @@ def get_loaders(args):
                 transforms.ToTensor(),
             ])
 
-
+        # Load Cifar-10 Datasets
         trainset = torchvision.datasets.CIFAR10(root='./data',
                                                 train=True,
                                                 download=True,
                                                 transform=transform_train)
-
-
         testset = torchvision.datasets.CIFAR10(root='./data',
                                             train=False,
                                             download=True,
@@ -506,12 +505,10 @@ def get_loaders(args):
     train_data_loader_list = []
     test_data_loader_list = []
     for client in range(args.size):
-        if client != args.attacker_user_id:
-            train_loader, test_loader, partition = partition_dataset(client, args.size, args, trainset, testset)
+        if client >= args.attacker_user_id:
+            train_loader, test_loader = partition_dataset(client, args, trainset, testset)
             train_data_loader_list.append(train_loader)
             test_data_loader_list.append(test_loader)
-            if args.attacker_user_id < 0:
-                train_attack_dataset, test_backdoor_loader, train_loader_bengin = [], [], []
 
         else:
             ### edge case attack
@@ -526,16 +523,15 @@ def get_loaders(args):
                     transforms.ToTensor(),
                     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),])
 
-                trainset_original = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train_edge_case)
-                poisoned_trainset = copy.deepcopy(trainset_original)
+                poisoned_trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train_edge_case)
                 with open('./saved_datasets/southwest_images_new_train.pkl', 'rb') as train_f:
                     saved_southwest_dataset_train = pickle.load(train_f)
 
                 with open('./saved_datasets/southwest_images_new_test.pkl', 'rb') as test_f:
                     saved_southwest_dataset_test = pickle.load(test_f)
 
-                sampled_targets_array_train = 9 * np.ones((saved_southwest_dataset_train.shape[0],), dtype =int) # southwest airplane -> label as truck
-                sampled_targets_array_test = 9 * np.ones((saved_southwest_dataset_test.shape[0],), dtype =int) # southwest airplane -> label as truck
+                sampled_targets_array_train = args.attack_target * np.ones((saved_southwest_dataset_train.shape[0],), dtype =int) 
+                sampled_targets_array_test = args.attack_target * np.ones((saved_southwest_dataset_test.shape[0],), dtype =int) 
 
                 num_sampled_poisoned_data_points = 100 # N
                 samped_poisoned_data_indices = np.random.choice(saved_southwest_dataset_train.shape[0],
@@ -566,9 +562,7 @@ def get_loaders(args):
 
                 # poisoned_train_loader = DataLoader(poisoned_trainset, batch_size=args.batch_size, shuffle=True)
 
-                testset_original = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test_edge_case)
-
-                test_attack_dataset = copy.deepcopy(testset_original)
+                test_attack_dataset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test_edge_case)
                 test_attack_dataset.data = saved_southwest_dataset_test
                 test_attack_dataset.targets = sampled_targets_array_test
 
@@ -581,7 +575,7 @@ def get_loaders(args):
                 train_attack_dataset = CIFAR10_attack('./data',  train=True, transform=transform_test,args=args)
                 test_attack_dataset = CIFAR10_attack('./data',  train=False, transform=transform_test, args=args)
 
-            train_loader_bengin, test_loader, partition = partition_dataset(client, args.size, args, trainset, testset)
+            # train_loader_bengin, test_loader = partition_dataset(client, args, trainset, testset)
 
             data_Loader = DataLoader(
                 train_attack_dataset,
@@ -596,6 +590,9 @@ def get_loaders(args):
 
             train_data_loader_list.append(data_Loader)
             test_data_loader_list.append(test_backdoor_loader)
+    # Get train_loader_bengin if there exists at least one attacker
+    if args.attacker_user_id > 0:        
+        train_loader_bengin, _ = partition_dataset(args.attacker_user_id - 1, args, trainset, testset)
     return train_data_loader_list, test_data_loader_list, train_attack_dataset, test_backdoor_loader, train_loader_bengin
 
 def Remove_and_Reconsitution_RGB_low(img_RGB):
@@ -706,59 +703,58 @@ class CIFAR10_attack(datasets.CIFAR10):
         return img, target
 
 def generate_communicate_user_list(args):
-    import random
-    random.seed(0)
-    np.random.seed(0)
+    """
+    Input
+    ---
+    args: argparse arguments.
 
-    ue_list_epoch = np.zeros((args.epoch, args.iteration, args.num_comm_ue), dtype='int32')
-
-    if args.num_comm_ue <= args.size - 1:
-        attacker_user_id_appear_list_E = np.zeros((args.epoch,))
-        attacker_user_id_appear_list = []
-        for e in range(args.epoch):
-            for it in range(args.iteration):
-                ue_list = np.arange(0, args.size).tolist()
-
-                if it == 0 or it > 1 and (it-1) % args.cp == 0:
-                    if e >= args.fine_tuning_start_round:
-                        ue_list.remove(args.attacker_user_id)
-                        connected_user_list = random.sample(ue_list, args.num_comm_ue)
-                    else:
-                        connected_user_list = random.sample(ue_list, args.num_comm_ue)
-
-                    ### We set attacker_user_id appears in the attack_epoch
-                    if args.one_shot_attack:
-                        if e == args.attack_epoch:
-                            connected_user_list = random.sample(ue_list, args.num_comm_ue)
-                            if args.attacker_user_id in set(connected_user_list):
-                                pass
-                            else:
-                                connected_user_list[0] = args.attacker_user_id
-                                random.shuffle(connected_user_list)
-
-                            attacker_user_id_appear_list.append([e,it])
-                            attacker_user_id_appear_list_E[e] = 1
-                            print('Attack round list:', attacker_user_id_appear_list, len(attacker_user_id_appear_list))
-                        else:
-                            if args.attacker_user_id in set(ue_list):
-                                ue_list.remove(args.attacker_user_id)
-                                connected_user_list = random.sample(ue_list, args.num_comm_ue)
-                    else:
-                        ### Just sampling a list of UEs, we maybe sample a attacker
-                        if args.attacker_user_id in set(connected_user_list):
-                            attacker_user_id_appear_list.append([e,it])
-                            attacker_user_id_appear_list_E[e] = 1
-                            print('Attack round list:', attacker_user_id_appear_list, len(attacker_user_id_appear_list))
-                        random.shuffle(connected_user_list)
-
-                ue_list = copy.deepcopy(connected_user_list)
-
-                ue_list = np.array(ue_list, dtype='int32')
-                ue_list_epoch[e,it,0:len(ue_list)] = ue_list
-
-        ue_list_epoch = np.array(ue_list_epoch, dtype='int32')
-
-    return ue_list_epoch
+    Return
+    ---
+    A 2D array with shape(args.epoch, args.num_comm_ue), which lists the ids of the communicating participants at each epoch.
+    """
+    # Set random seed
+    random.seed(1)
+    
+    # Assume participants with id in range(0, args.attacker_user_id) are all attackers.
+    malicious_id = range(0, args.attacker_user_id)
+    benign_id = range(args.attacker_user_id, args.size)
+    all_id = range(args.size)
+    
+    # Declare the result variable
+    result = []
+    
+    # CASE 1: One Shot Attack
+    if args.one_shot_attack:
+        # Generate a communicating participant id list for each epoch before the args.attack_epoch
+        for epoch in range(args.attack_epoch):
+            result.append(random.sample(benign_id, k=args.num_comm_ue))
+        
+        # Generate a communicating participant id list at the args.attack_epoch round. Notice at 
+        # this round, there will be one and only one attacker participates. The rest of the participants
+        # are benign users.
+        result.append([0] + (random.sample(benign_id, k=args.num_comm_ue - 1)))
+        
+        # Generate a communicating participant id list for each epoch after the args.attack_epoch.
+        # Notice there won't be attackers anymore since this is a one-shot attack.
+        for epoch in range(args.attack_epoch, args.epoch):
+            result.append(random.sample(benign_id, k=args.num_comm_ue))
+        
+    # CASE 2: Not One Shot Attack
+    else: 
+        # Generate a communicating participant id list for each epoch before the args.attack_epoch
+        for epoch in range(args.attack_epoch):
+            result.append(random.sample(benign_id, k=args.num_comm_ue))
+        
+        # Generate a communicating participant id list for each epoch after the args.attack_epoch
+        # and before the fine tuning rounds.
+        for epoch in range(args.attack_epoch, args.fine_tuning_start_round):
+            result.append(random.sample(all_id, k=args.num_comm_ue))
+        
+        # Generate a communicating participant id list for each epoch during the fine tuning rounds.
+        for epoch in range(args.fine_tuning_start_round, args.epoch):
+            result.append(random.sample(benign_id, k=args.num_comm_ue))
+    
+    return np.array(result)
 
 def save_model(experiment_name, model, rank, epoch):
     path_checkpoint = "./checkpoint/%s/" %(experiment_name)
@@ -817,7 +813,7 @@ def scale_backdoor_weight(args, model, avg_model):
     return model
 
 
-def test_backdoor(args, model, valset=None, v=0, target=1, criterion=None):
+def test_backdoor(args, model, valset=None, v=0, criterion=None):
 
     if 'adver' in args.attack_type or 'pattern' in args.attack_type:
 

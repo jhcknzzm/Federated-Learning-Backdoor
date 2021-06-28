@@ -14,7 +14,7 @@ def get_slurm_script(args, job_script):
 #SBATCH --nodelist={args.nodes} # if you need specific nodes
 ##SBATCH --exclude=ace,blaze,bombe,flaminio,freddie,luigi,pavia,r[10,16],atlas,como,havoc,steropes
 #SBATCH -t 5-00:00 # time requested (D-HH:MM)
-#SBATCH -D /work/yyaoqing/oliver/Personalized_SSFL/FL_Backdoor_2021_v6/
+#SBATCH -D /work/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_CV
 #SBATCH -o slurm_log/slurm.%N.%j..out # STDOUT
 #SBATCH -e slurm_log/slurm.%N.%j..err # STDERR
 
