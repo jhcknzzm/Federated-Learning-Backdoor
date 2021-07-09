@@ -168,8 +168,12 @@ def train(helper, epoch, sampled_participants):
 
                     print('Target Tirgger Loss and Acc. :', loss_p, acc_p)
                     print("l2 norm of attacker's last epoch: ", l2_norm)
+                    ### original termination condition:
+                    # if loss_p <= threshold or acc_initial - acc_main>1.0:
+                    
+                    ### current termination condition
                     if acc_p >= 100/float(len(helper.params['poison_epochs'])):
-                        
+
                         print('Backdoor training over. ')
                         raise ValueError()
             # else:
