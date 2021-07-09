@@ -36,6 +36,7 @@ torch.cuda.manual_seed(1)
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.enabled=False
 
 random.seed(0)
 np.random.seed(0)
@@ -51,6 +52,7 @@ def check_params(params):
 def get_embedding_weight_from_LSTM(model):
     embedding_weight = model.return_embedding_matrix()
     return embedding_weight
+
 
 def train(helper, epoch, sampled_participants):
     ### Accumulate weights for all participants.
@@ -129,15 +131,13 @@ def train(helper, epoch, sampled_participants):
                         poison_optimizer.zero_grad()
                         hidden = helper.repackage_hidden(hidden)
                         output, hidden = model(data, hidden)
-
                         if helper.params['all_token_loss']:
                             loss = criterion(output.view(-1, helper.n_tokens), targets)
                         else:
                             loss = criterion(output[-1:].view(-1, helper.n_tokens),
                                                    targets[-helper.params['batch_size']:])
                         loss.backward(retain_graph=True)
-
-
+                        
                         if helper.params['grad_mask']:
                             mask_grad_list_copy = iter(mask_grad_list)
                             for name, parms in model.named_parameters():
@@ -145,49 +145,47 @@ def train(helper, epoch, sampled_participants):
                                     parms.grad = parms.grad * next(mask_grad_list_copy)
 
                         poison_optimizer.step()
-
                         # global - g*lr
                         # global - (global - g*lr)  =  g * lr
                         # g * lr / n
                         # global - g * lr / n
-                        weight_difference = helper.get_weight_difference(target_params_variables, model.named_parameters())
-                        clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference)
-                        weight_difference = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
-                        model.copy_params(weight_difference)
-                        del clipped_weight_difference
-                        del weight_difference
+                        if helper.params['PGD']:
+                            weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
+                            clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                            weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
+                            model.copy_params(weight_difference)
 
-                    # get the test acc of the main task with the trained attacker
-                    loss, acc = test(helper=helper, epoch=epoch, data_source=helper.test_data,
-                                     model=model)
+                        # get the test acc of the main task with the trained attacker
+                        loss, acc = test(helper=helper, epoch=epoch, data_source=helper.test_data,
+                                         model=model)
+                        # get the test acc of the target test data with the trained attacker
+                        loss_p, acc_p = test_poison(helper=helper, epoch=internal_epoch,
+                                                data_source=helper.test_data_poison,
+                                                model=model, Top5=args.Top5)
+                        print('Target Tirgger Loss and Acc. :', loss_p, acc_p)
+                        weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
+                        clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                        print("l2 norm of attacker's: ", l2_norm)
 
-                    # get the test acc of the target test data with the trained attacker
-                    loss_p, acc_p = test_poison(helper=helper, epoch=internal_epoch,
-                                            data_source=helper.test_data_poison,
-                                            model=model, Top5=args.Top5)
 
-                    print('Target Tirgger Loss and Acc. :', loss_p, acc_p)
-                    print("l2 norm of attacker's last epoch: ", l2_norm)
-                    ### original termination condition:
-                    # if loss_p <= threshold or acc_initial - acc_main>1.0:
-                    
-                    ### current termination condition
-                    if acc_p >= 100/float(len(helper.params['poison_epochs'])):
-
-                        print('Backdoor training over. ')
-                        raise ValueError()
+                        ### original termination condition:
+                        # if loss_p <= threshold or acc_initial - acc_main>1.0:
+                        ### current termination condition
+                        if acc_p >= helper.params['traget_poison_acc'][helper.params['attack_num']]:
+                            print('Backdoor training over. ')
+                            raise ValueError()
             # else:
             except ValueError:
                 print('Converged earlier')
+                helper.params['attack_num'] += 1
+
 
             # Server perform clipping
             if helper.params['diff_privacy']:
-                weight_difference = helper.get_weight_difference(target_params_variables, model.named_parameters())
-                clipped_weight_difference, _ = helper.clip_grad(helper.params['s_norm'], weight_difference)
-                weight_difference = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
+                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
+                clipped_weight_difference, _ = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                 model.copy_params(weight_difference)
-                del clipped_weight_difference
-                del weight_difference
 
 
             trained_posioned_model_weights = model.named_parameters()
@@ -241,15 +239,14 @@ def train(helper, epoch, sampled_participants):
                                             math.exp(cur_loss) if cur_loss < 30 else -1.))
                         total_loss = 0
                         start_time = time.time()
-            print('benign user l2 norm of last epoch: ', l2_norm)
+
 
             if helper.params['diff_privacy']:
-                weight_difference = helper.get_weight_difference(target_params_variables, model.named_parameters())
-                clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference)
-                weight_difference = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
+                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
+                clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                 model.copy_params(weight_difference)
-                del clipped_weight_difference
-                del weight_difference
+                print("l2 norm of benign user in last epoch: ", l2_norm)
 
         for name, data in model.state_dict().items():
             #### don't scale tied weights:
@@ -407,10 +404,10 @@ def test_poison(helper, epoch, data_source,
 def save_acc_file(prefix=None,acc_list=None,sentence=None,new_folder_name=None):
     if new_folder_name is None:
         # path_checkpoint = f'./results_update_DuelTrigger/{sentence}'
-        path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_DuelTrigger_SameStructure/{sentence}')
+        path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD/{sentence}')
     else:
         # path_checkpoint = f'./results_update_DuelTrigger/{new_folder_name}/{sentence}'
-        path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_DuelTrigger_SameStructure/{new_folder_name}/{sentence}')
+        path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD/{new_folder_name}/{sentence}')
 
     if not os.path.exists(path_checkpoint):
         os.makedirs(path_checkpoint)
@@ -469,19 +466,11 @@ if __name__ == '__main__':
                         help='Top5')
 
     parser.add_argument('--start_epoch',
-                        default=1,
+                        default=2001,
                         type=int,
                         help='Load pre-trained benign model that has been trained for start_epoch - 1 epoches, and resume from here')
 
-    parser.add_argument('--random_middle_vocabulary_attack',
-                        default=0,
-                        type=int,
-                        help='random_middle_vocabulary_attack')
 
-    parser.add_argument('--attack_adver_train',
-                        default=0,
-                        type=int,
-                        help='attack_adver_train') # all_token_loss
 
     parser.add_argument('--all_token_loss',
                         default=1,
@@ -523,10 +512,20 @@ if __name__ == '__main__':
                         type=float,
                         help='s_norm')
 
+    parser.add_argument('--PGD',
+                        default=0,
+                        type=int,
+                        help='wheather to use the PGD technique')
+
     parser.add_argument('--dual',
                         default=False,
                         type=bool,
                         help='wheather to use the dual technique')
+
+    parser.add_argument('--attack_freq_type',
+                        default='consecutive_attack',
+                        type=str,
+                        help='consecutive_attack, uniformly_attack, or random_attack')
 
     parser.add_argument('--sentence_id_list', nargs='+', type=int)
     args = parser.parse_args()
@@ -547,7 +546,8 @@ if __name__ == '__main__':
         params_loaded['sentence_id_list'] = args.sentence_id_list[0]
     else:
         params_loaded['sentence_id_list'] = args.sentence_id_list
-    params_loaded['end_epoch'] = args.start_epoch + 1000
+
+    params_loaded['end_epoch'] = args.start_epoch + 300
 
     if os.path.isdir('/data/yyaoqing/backdoor_NLP_data/'):
         params_loaded['data_folder'] = '/data/yyaoqing/backdoor_NLP_data/'
@@ -564,7 +564,17 @@ if __name__ == '__main__':
     helper.create_model()
     helper.load_benign_data()
     helper.load_attacker_data()
-
+    ### hard code
+    if args.attack_freq_type == 'consecutive_attack':
+        helper.params['poison_epochs'] = np.arange(args.start_epoch+1, args.start_epoch+11).tolist()
+    elif args.attack_freq_type == 'uniformly_attack':
+        interval = 10
+        helper.params['poison_epochs'] = np.arange(args.start_epoch+1, args.start_epoch+1+100,10).tolist()
+    elif args.attack_freq_type == 'random_attack':
+        attack_epoch_tmp = random.sample(list(range(args.start_epoch+1, args.start_epoch+1+100)), 10)
+        helper.params['poison_epochs'] = attack_epoch_tmp.sort()
+    print('attack epochs are:',helper.params['poison_epochs'])
+    helper.params['traget_poison_acc'] = list(range(10,101,len(helper.params['poison_epochs'])))
 
     weight_accumulator = None
     backdoor_acc = []
@@ -610,7 +620,7 @@ if __name__ == '__main__':
         partipant_sample_size = helper.params['partipant_sample_size']
         len_poison_sentences = len(helper.params['poison_sentences'])
 
-        dir_name = helper.params['sentence_name']+f"Duel{args.random_middle_vocabulary_attack}_GradMask{helper.params['grad_mask']}_PGD{args.attack_adver_train}_DP{args.diff_privacy}_SNorm{args.s_norm}_SemanticTarget{args.semantic_target}_AllTokenLoss{args.all_token_loss}_AttacktEpoch{args.start_epoch}"
+        dir_name = helper.params['sentence_name']+f"Duel{args.dual}_GradMask{helper.params['grad_mask']}_PGD{args.PGD}_DP{args.diff_privacy}_SNorm{args.s_norm}_SemanticTarget{args.semantic_target}_AllTokenLoss{args.all_token_loss}_AttacktFreqType{args.attack_freq_type}"
         print(dir_name)
 
         if helper.params['is_poison']:

@@ -7,14 +7,14 @@ test_batch_size: 10
 batch_size: 20
 
 # Benign learning rate
-lr: 20
+lr: 2
 momentum: 0
 decay: 0
 retrain_no_times: 2
 
 number_of_total_participants: 80000
 # number_of_total_participants: 800
-eta: 800
+eta: 8000
 
 # experiment_name: the_buy_new_phone_from_Google
 experiment_name: buy new phone from Google_AdverTrain_PGD_resume
@@ -40,12 +40,14 @@ random_compromise: false
 # Number of total partipants aka. participant pool size. Should be <80000
 partipant_population: 8000
 
-# Number of partipants sampled at each round to participate FedAvg 
+# Number of partipants sampled at each round to participate FedAvg
 partipant_sample_size: 10
 
 size_of_secret_dataset: 1280
 poison_epochs: [2001]
-retrain_poison: 500 #250
+traget_poison_acc: [10,20,30,40,50,60,70,80,90,100]
+retrain_poison: 50 #250
+attack_num: 0
 scale_weights: 100
 poison_lr: 0.2
 clamp_value: 0.1

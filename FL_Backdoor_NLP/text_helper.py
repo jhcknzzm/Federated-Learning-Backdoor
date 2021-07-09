@@ -66,7 +66,7 @@ class TextHelper(Helper):
         self.n_tokens = len(self.dictionary)
         super(TextHelper, self).__init__(params)
 
-  
+
     @staticmethod
     def batchify(data, bsz):
         # Work out how cleanly we can divide the dataset into bsz parts.
@@ -181,7 +181,7 @@ class TextHelper(Helper):
         else:
             self.params['adversary_list'] = list()
 
-        # Batchify training data and testing data        
+        # Batchify training data and testing data
         self.train_data = [self.batchify(data_chunk, self.params['batch_size']) for data_chunk in
                            self.corpus.train]
         self.test_data = self.batchify(self.corpus.test, self.params['test_batch_size'])
@@ -190,7 +190,7 @@ class TextHelper(Helper):
 
     def create_model(self):
 
-        local_model = RNNModel(name='Local_Model', 
+        local_model = RNNModel(name='Local_Model',
                                rnn_type='LSTM', ntoken=self.n_tokens,
                                ninp=self.params['emsize'], nhid=self.params['nhid'],
                                nlayers=self.params['nlayers'],
@@ -203,7 +203,7 @@ class TextHelper(Helper):
                                 nlayers=self.params['nlayers'],
                                 dropout=self.params['dropout'], tie_weights=self.params['tied'])
         target_model.cuda()
-        
+
         # Load pre-trained model
         if self.params['start_epoch'] > 1:
             # loaded_params = torch.load(os.path.join('saved_models', 'resume', f"model_epoch_{self.params['start_epoch'] - 1}"))
