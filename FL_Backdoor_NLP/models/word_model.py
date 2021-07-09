@@ -3,12 +3,6 @@ from torch.autograd import Variable
 
 from models.simple import SimpleNet
 import torch
-import random
-import numpy as np
-
-
-random.seed(0)
-np.random.seed(0)
 
 extracted_grads = []
 def extract_grad_hook(module, grad_in, grad_out):
@@ -18,12 +12,8 @@ def extract_grad_hook(module, grad_in, grad_out):
 class RNNModel(SimpleNet):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
-    def __init__(self, name, created_time, rnn_type, ntoken, ninp, nhid, nlayers, dropout=0.5, tie_weights=False):
-        super(RNNModel, self).__init__(name=name, created_time=created_time)
-
-        torch.manual_seed(1)
-        torch.cuda.manual_seed(1)
-
+    def __init__(self, name, rnn_type, ntoken, ninp, nhid, nlayers, dropout=0.5, tie_weights=False):
+        super(RNNModel, self).__init__(name=name)
         self.drop = nn.Dropout(dropout)
         self.encoder = nn.Embedding(ntoken, ninp)
 
@@ -46,7 +36,7 @@ class RNNModel(SimpleNet):
         # and
         # "Tying Word Vectors and Word Classifiers: A Loss Framework for Language Modeling" (Inan et al. 2016)
         # https://arxiv.org/abs/1611.01462
-
+        
         if tie_weights:
             if nhid != ninp:
                 raise ValueError('When using the tied flag, nhid must be equal to emsize')
@@ -61,7 +51,7 @@ class RNNModel(SimpleNet):
     def init_weights(self):
         initrange = 0.1
         self.encoder.weight.data.uniform_(-initrange, initrange)
-        self.decoder.bias.data.fill_(0.0)
+        self.decoder.bias.data.fill_(0)
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def return_embedding_matrix(self):
@@ -84,7 +74,6 @@ class RNNModel(SimpleNet):
 
         output, hidden = self.rnn(emb, hidden)
         output = self.drop(output)
-        # output = output
 
         #### use output = self.drop(output) as output features
         decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))

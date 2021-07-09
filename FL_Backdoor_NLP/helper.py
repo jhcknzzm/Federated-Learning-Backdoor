@@ -1,5 +1,5 @@
 from shutil import copyfile
-
+import datetime
 import math
 import torch
 
@@ -11,7 +11,6 @@ import copy
 import random
 from torch.nn.functional import log_softmax
 import torch.nn.functional as F
-logger = logging.getLogger("logger")
 import os
 from torch.autograd.gradcheck import zero_gradients
 from copy import deepcopy
@@ -23,8 +22,7 @@ random.seed(0)
 np.random.seed(0)
 
 class Helper:
-    def __init__(self, current_time, params, name):
-        self.current_time = current_time
+    def __init__(self, params):
         self.target_model = None
         self.local_model = None
 
@@ -34,61 +32,31 @@ class Helper:
         self.test_data_poison = None
 
         self.params = params
-        self.name = name
         self.best_loss = math.inf
-        self.folder_path = f'saved_models/model_{self.name}_{current_time}'
-        try:
-            os.mkdir(self.folder_path)
-        except FileExistsError:
-            logger.info('Folder already exists')
-        logger.addHandler(logging.FileHandler(filename=f'{self.folder_path}/log.txt'))
-        logger.addHandler(logging.StreamHandler())
-        logger.setLevel(logging.DEBUG)
-        logger.info(f'current path: {self.folder_path}')
-        if not self.params.get('environment_name', False):
-            self.params['environment_name'] = self.name
-
-        self.params['current_time'] = self.current_time
-        self.params['folder_path'] = self.folder_path
-
-    def save_checkpoint(self, state, is_best, filename='checkpoint.pth.tar'):
-        if not self.params['save_model']:
-            return False
-        torch.save(state, filename)
-
-        if is_best:
-            copyfile(filename, 'model_best.pth.tar')
 
     @staticmethod
-    def model_global_norm(model):
-        squared_sum = 0
-        for name, layer in model.named_parameters():
-            squared_sum += torch.sum(torch.pow(layer.data, 2))
-        return math.sqrt(squared_sum)
+    def get_weight_difference(weight1, weight2):
+        difference = {}
+        if type(weight2) == dict:
+            for name, layer in weight1.items():
+                difference[name] = layer.data - weight2[name].data  
+        else:
+            for name, layer in weight2:
+                difference[name] = weight1[name].data - layer.data
+        return difference
 
     @staticmethod
-    def model_dist_norm(model, target_params):
-        squared_sum = 0
-        for name, layer in model.named_parameters():
-            squared_sum += torch.sum(torch.pow(layer.data - target_params[name].data, 2))
-        return math.sqrt(squared_sum)
+    def clip_grad(norm_bound, weight_difference):
+        combined_tensor = []
+        for tensor in weight_difference.values():
+            combined_tensor.extend(torch.flatten(tensor).tolist())
+        l2_norm = torch.norm(torch.tensor(combined_tensor, requires_grad=False).cuda())
+        scale =  max(1, float(torch.abs(l2_norm / norm_bound)))
+        for name in weight_difference.keys():
+            weight_difference[name] /= scale
+        return weight_difference, l2_norm
 
-
-    @staticmethod
-    def model_max_values(model, target_params):
-        squared_sum = list()
-        for name, layer in model.named_parameters():
-            squared_sum.append(torch.max(torch.abs(layer.data - target_params[name].data)))
-        return squared_sum
-
-
-    @staticmethod
-    def model_max_values_var(model, target_params):
-        squared_sum = list()
-        for name, layer in model.named_parameters():
-            squared_sum.append(torch.max(torch.abs(layer - target_params[name])))
-        return sum(squared_sum)
-
+  
     @staticmethod
     def get_one_vec(model, variable=False):
         size = 0
@@ -132,9 +100,6 @@ class Helper:
         # target_vec.requires_grad = False
         cs_sim = torch.nn.functional.cosine_similarity(self.params['scale_weights']*(model_vec-target_var) + target_var, target_var, dim=0)
         # cs_sim = cs_loss(model_vec, target_vec)
-        logger.info("los")
-        logger.info( cs_sim.data[0])
-        logger.info(torch.norm(model_vec - target_var).data[0])
         loss = 1-cs_sim
 
         return 1e3*loss
@@ -174,42 +139,28 @@ class Helper:
 
         return
 
-    def grad_mask(self, helper, model, dataset_clearn, optimizer, criterion):
+    def grad_mask(self, helper, model, dataset_clearn, criterion):
+        """Generate a gradient mask based on the given dataset"""
         data_iterator = range(0, dataset_clearn.size(0) - 1, helper.params['bptt'])
-
         hidden = model.init_hidden(helper.params['batch_size'])
         ntokens = 50000
-        optimizer.zero_grad()
-        for batch_id, batch in enumerate(data_iterator):
+        model.zero_grad()
+        for batch in data_iterator:
             model.train()
-
-            data, targets = helper.get_batch(dataset_clearn, batch,
-                                              evaluation=False)
-
+            data, targets = helper.get_batch(dataset_clearn, batch)
             hidden = helper.repackage_hidden(hidden)
             output, hidden = model(data, hidden)
-            print('data sum',data.sum().item(),targets.sum().item(),output.sum().item())
             class_loss = criterion(output.view(-1, ntokens), targets)
-            # class_loss = criterion(output[-1:].view(-1, ntokens),
-            #                        targets[-helper.params['batch_size']:])
-            # print('data sum',data.sum().item(),class_loss.item())
-
-            class_loss.backward()
+            class_loss.backward(retain_graph=True)
 
         mask_grad_list = []
-        for name, parms in model.named_parameters():
+        for _, parms in model.named_parameters():
             if parms.requires_grad:
-                grad = parms.grad
-                print(name,'param/grad sum',parms.sum(),grad.sum())
-                # mask = parms.grad.le(1e-7).float()
                 mask = parms.grad.abs().le(1e-3).float()
                 print(mask.sum())
-                print(name,'param/grad sum:',parms.sum().item(),grad.sum().item())
-
                 mask_grad_list.append(mask)
 
-        optimizer.zero_grad()
-        # yuyuyuyu
+        model.zero_grad()
         return mask_grad_list
 
     def test_poison(self, helper, epoch, data_source, criterion,
@@ -227,7 +178,7 @@ class Helper:
             dataset_size = len(data_source)
 
         for batch_id, batch in enumerate(data_iterator):
-            data, targets = helper.get_batch(data_source, batch, evaluation=True)
+            data, targets = helper.get_batch(data_source, batch)
 
             output, hidden = model(data, hidden)
 
@@ -319,7 +270,7 @@ class Helper:
                 num_data = 0
                 for batch_id, batch in enumerate(data_iterator):
                     poison_optimizer.zero_grad()
-                    data, targets = helper.get_batch(poisoned_data, batch, False)
+                    data, targets = helper.get_batch(poisoned_data, batch)
 
                     if data.size(0) != 64:
                         continue
@@ -455,7 +406,7 @@ class Helper:
         std_grad = 0.0
         for batch_id, batch in enumerate(data_iterator):
             model.train()
-            data, targets = helper.get_batch(poisoned_data, batch, False)
+            data, targets = helper.get_batch(poisoned_data, batch)
             poison_optimizer.zero_grad()
             hidden = helper.repackage_hidden(hidden)
             output, hidden = model(data, hidden)
@@ -499,7 +450,7 @@ class Helper:
             data_iterator = range(0, poisoned_data.size(0) - 1, helper.params['bptt'])
             for batch_id, batch in enumerate(data_iterator):
                 model.train()
-                data, targets = helper.get_batch(poisoned_data, batch, False)
+                data, targets = helper.get_batch(poisoned_data, batch)
                 poison_optimizer.zero_grad()
                 hidden = helper.repackage_hidden(hidden)
                 output, hidden = model(data, hidden)
@@ -528,8 +479,7 @@ class Helper:
             for batch_id, batch_1 in enumerate(data_iterator):
                 model.train()
                 optimizer.zero_grad()
-                data, targets = helper.get_batch(dataset_clearn, batch_1,
-                                                  evaluation=False)
+                data, targets = helper.get_batch(dataset_clearn, batch_1)
 
                 hidden = helper.repackage_hidden(hidden)
                 output, hidden = model(data, hidden)
@@ -666,16 +616,10 @@ class Helper:
 
             cs = F.cosine_similarity(model_update,
                                      target_params_variables[name].view(-1), dim=0)
-            # logger.info(torch.equal(layer.view(-1),
-            #                          target_params_variables[name].view(-1)))
-            # logger.info(name)
-            # logger.info(cs.data[0])
-            # logger.info(torch.norm(model_update).data[0])
-            # logger.info(torch.norm(fake_weights[name]))
+
             cs_list.append(cs)
         cos_los_submit = 1*(1-sum(cs_list)/len(cs_list))
-        logger.info(model_id)
-        logger.info((sum(cs_list)/len(cs_list)).data[0])
+
         return 1e3*sum(cos_los_submit)
 
     def accum_similarity(self, last_acc, new_acc):
@@ -683,23 +627,14 @@ class Helper:
         cs_list = list()
 
         cs_loss = torch.nn.CosineSimilarity(dim=0)
-        # logger.info('new run')
         for name, layer in last_acc.items():
 
             cs = cs_loss(Variable(last_acc[name], requires_grad=False).view(-1),
                          Variable(new_acc[name], requires_grad=False).view(-1)
 
                          )
-            # logger.info(torch.equal(layer.view(-1),
-            #                          target_params_variables[name].view(-1)))
-            # logger.info(name)
-            # logger.info(cs.data[0])
-            # logger.info(torch.norm(model_update).data[0])
-            # logger.info(torch.norm(fake_weights[name]))
             cs_list.append(cs)
         cos_los_submit = 1*(1-sum(cs_list)/len(cs_list))
-        # logger.info("AAAAAAAA")
-        # logger.info((sum(cs_list)/len(cs_list)).data[0])
         return sum(cos_los_submit)
 
 
@@ -732,23 +667,6 @@ class Helper:
 
         return True
 
-    def save_model(self, model=None, epoch=0, val_loss=0):
-        if model is None:
-            model = self.target_model
-        if self.params['save_model']:
-            # save_model
-            logger.info("saving model")
-            model_name = '{0}/model_last.pt.tar'.format(self.params['folder_path'])
-            saved_dict = {'state_dict': model.state_dict(), 'epoch': epoch,
-                          'lr': self.params['lr']}
-            self.save_checkpoint(saved_dict, False, model_name)
-            if epoch in self.params['save_on_epochs']:
-                logger.info(f'Saving model on epoch {epoch}')
-                self.save_checkpoint(saved_dict, False, filename=f'{model_name}.epoch_{epoch}')
-            if val_loss < self.best_loss:
-                self.save_checkpoint(saved_dict, False, f'{model_name}.best')
-                self.best_loss = val_loss
-
     def estimate_fisher(self, model, criterion,
                         data_loader, sample_size, batch_size=64):
         # sample loglikelihoods from the dataset.
@@ -780,13 +698,11 @@ class Helper:
 
             # if len(loglikelihoods) >= sample_size // batch_size:
             #     break
-        # logger.info(loglikelihoods[0].shape)
         # estimate the fisher information of the parameters.
         print(loglikelihoods)
 
         # loglikelihood = torch.cat(loglikelihoods).mean(0)
         loglikelihood = loglikelihoods_mean/(float(batch_id+1))
-        logger.info(loglikelihood.shape)
         loglikelihood_grads = torch.autograd.grad(loglikelihood, model.parameters())
 
         parameter_names = [

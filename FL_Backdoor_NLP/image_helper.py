@@ -27,10 +27,10 @@ class ImageHelper(Helper):
 
     def create_model(self):
         local_model = ResNet18(name='Local',
-                    created_time=self.params['current_time'])
+                    created_time=self.current_time)
         local_model.cuda()
         target_model = ResNet18(name='Target',
-                        created_time=self.params['current_time'])
+                        created_time=self.current_time)
         target_model.cuda()
         if self.params['resumed_model']:
             loaded_params = torch.load(f"saved_models/{self.params['resumed_model']}")
@@ -122,13 +122,13 @@ class ImageHelper(Helper):
 
     def poison_test_dataset(self):
         #
-        return [(self.train_dataset[self.params['poison_image_id']][0],
-        torch.IntTensor(self.params['poison_label_swap']))]
-        # return torch.utils.data.DataLoader(self.train_dataset,
-        #                    batch_size=self.params['batch_size'],
-        #                    sampler=torch.utils.data.sampler.SubsetRandomSampler(
-        #                        range(1000)
-        #                    ))
+        # return [(self.train_dataset[self.params['poison_image_id']][0],
+        # torch.IntTensor(self.params['poison_label_swap']))]
+        return torch.utils.data.DataLoader(self.train_dataset,
+                           batch_size=self.params['batch_size'],
+                           sampler=torch.utils.data.sampler.SubsetRandomSampler(
+                               range(1000)
+                           ))
 
 
     def load_data(self):
@@ -237,3 +237,4 @@ class ImageHelper(Helper):
             data.requires_grad_(False)
             target.requires_grad_(False)
         return data, target
+

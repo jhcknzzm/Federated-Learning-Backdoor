@@ -7,7 +7,7 @@ momentum: 0.9
 decay: 0.0005
 batch_size: 64
 
-no_models: 10
+partipant_sample_size: 10
 epochs: 10100
 retrain_no_times: 2
 

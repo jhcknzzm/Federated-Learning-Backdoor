@@ -32,11 +32,11 @@ export PYTHONUNBUFFERED=1
 wait
 date
 
-## This script run {args.file_name}
+## This script run {args.experiment_name}
 """
 
 
-def get_script(args, sentence_id_list, BASH_COMMAND_LIST):
+def get_script(args, BASH_COMMAND_LIST):
 
     print("Start writing the command list!")
 
@@ -49,7 +49,7 @@ def get_script(args, sentence_id_list, BASH_COMMAND_LIST):
     # print(script)
 
 
-    file_path = f'./run_slurm/sentence_id_list_{sentence_id_list}_backdoor/'
+    file_path = './run_slurm/'
     if not os.path.exists(file_path):
         os.makedirs(file_path)
 
@@ -85,7 +85,7 @@ if __name__ == "__main__":
                         help='num_gpus')
 
     parser.add_argument('--cpus_per_task',
-                        default=2,
+                        default=8,
                         type=int,
                         help='cpus_per_task')
 
@@ -95,7 +95,7 @@ if __name__ == "__main__":
                         help='nodes')
 
     parser.add_argument('--lr',
-                        default=0.1,
+                        default=2.0,
                         type=float,
                         help='learning rate')
 
@@ -104,42 +104,20 @@ if __name__ == "__main__":
                         type=int,
                         help='The random_id-th random number')
 
-    parser.add_argument('--grad_mask',
-                        default=0,
-                        type=int,
-                        help='grad_mask')
-
-    parser.add_argument('--Top5',
-                        default=0,
-                        type=int,
-                        help='Top5')
-
-
     parser.add_argument('--start_epoch',
-                        default=2000,
+                        default=1,
                         type=int,
-                        help='start_epoch')
-
+                        help='Load pre-trained benign model that has been trained for start_epoch - 1 epoches, and resume from here')
 
     parser.add_argument('--random_middle_vocabulary_attack',
                         default=0,
                         type=int,
                         help='random_middle_vocabulary_attack')
 
-    parser.add_argument('--attack_adver_train',
-                        default=0,
-                        type=int,
-                        help='attack_adver_train') # all_token_loss
-
     parser.add_argument('--all_token_loss',
                         default=0,
                         type=int,
                         help='all_token_loss')
-
-    parser.add_argument('--ripple_loss',
-                        default=0,
-                        type=int,
-                        help='ripple_loss')
 
     parser.add_argument('--attack_all_layer',
                         default=0,
@@ -151,83 +129,73 @@ if __name__ == "__main__":
                         type=int,
                         help='run_slurm')
 
-    parser.add_argument('--all_trigger',
+    parser.add_argument('--same_structure',
+                        default=True,
+                        type=bool,
+                        help='same_structure')
+
+    parser.add_argument('--num_middle_token_same_structure',
+                        default=300,
+                        type=int,
+                        help='num_middle_token_same_structure')
+
+    parser.add_argument('--semantic_target',
+                        default=True,
+                        type=bool,
+                        help='semantic_target')
+
+    parser.add_argument('--diff_privacy',
+                        default=True,
+                        type=bool,
+                        help='diff_privacy')
+
+    parser.add_argument('--s_norm',
+                        default=1,
+                        type=float,
+                        help='s_norm')
+
+    parser.add_argument('--PGD',
                         default=0,
                         type=int,
-                        help='all_trigger')
+                        help='wheather to use the PGD technique')
+
+    parser.add_argument('--dual',
+                        default=False,
+                        type=bool,
+                        help='wheather to use the dual technique')
+
+    parser.add_argument('--attack_freq_type',
+                        default='consecutive_attack',
+                        type=int,
+                        help='consecutive_attack, uniformly_attack, or random_attack')
 
     args = parser.parse_args()
-    random.seed(0)
-    np.random.seed(0)
-
     #### For now exper.
     attack_epoch = [2000]
     #### We have 5 sentence to test
-    sentence_id_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    sentence_id_list = [10, 11, 12, 13, 14]
-    sentence_id_list = np.arange(20).tolist()
+    sentence_id_list = [0, 1, 2, 3, 4]
 
-    sentence_id_backdoor_training_list = []
-    for i in range(10):
-        sentence_id_backdoor_training = random.sample(sentence_id_list, 5)
-        sentence_id_backdoor_training_list.append(sentence_id_backdoor_training)
-
-    #### paprm.
-    random_middle_vocabulary_attack_list = [0, 1]
-    attack_adver_train = [0, 1]
-    attack_all_layer_list = [0, 1]
-    grad_mask_list = [0, 1]
-    all_token_loss_list = [0, 1]
-
-    ripple_loss_list = [0, 1]
-
-    #### experiment_code: [random_middle_vocabulary_attack_list, attack_adver_train, attack_all_layer_list, grad_mask_list, all_token_loss_list]
-    # experiment_code_list = [[1,1,1,1,1], [0,1,1,1,1], [1,0,1,1,1], [1,1,0,1,1], [1,1,1,0,1], [1,1,1,1,0]]
-    # experiment_code_list = [[1,1,0,1,1], [0,1,0,1,1], [1,0,0,1,1], [1,1,0,0,1], [1,1,0,1,0]]
-    # experiment_code_list = [[0,0,0,0,0],[1,1,0,1,1], [0,1,0,1,1], [1,0,0,1,1], [1,1,0,0,1], [1,1,0,1,0]]
-    experiment_code_list = [[0,0,0,0,0],[1,1,0,1,1], [0,1,0,1,1], [1,1,0,0,1]]
-
-
-    for exp_id in range(len(sentence_id_backdoor_training_list)):
-        sentence_id_list = sentence_id_backdoor_training_list[exp_id]
-
-        all_trigger_list = [1, 0]
+    experiment_code_list = [[0,0,0,0], [0,1,1,1], [0,1,1,0], [0,0,1,0], [0,1,0,0]]
+    attack_freq_type_list = [consecutive_attack, uniformly_attack, random_attack]
+    for sentence_id in sentence_id_list:
         BASH_COMMAND_LIST = []
-        for all_trigger in all_trigger_list:
-            if all_trigger:
-                for code_id in experiment_code_list:
-                    args.random_middle_vocabulary_attack, args.attack_adver_train, args.attack_all_layer, args.grad_mask, args.all_token_loss =\
-                    code_id[0], code_id[1], code_id[2], code_id[3], code_id[4]
+        for code_id in experiment_code_list:
+            args.dual, args.grad_mask, args.PGD, args.all_token_loss =\
+            code_id[0], code_id[1], code_id[2], code_id[3]
 
-                    args.file_name = f'AllSentence_as_Trigger_{sentence_id_list}_run.sh'
-                    args.experiment_name = f'AllSentence_as_Trigger_{sentence_id_list}_Duel{args.random_middle_vocabulary_attack}_GradMask{args.grad_mask}_PGD{args.attack_adver_train}_AttackAllLayer{args.attack_all_layer}_Ripple{args.ripple_loss}_AllTokenLoss{args.all_token_loss}'
-                    node = args.nodes
+            args.sentence_id = sentence_id
 
-                    comm = f" --nodelist={node} --gres=gpu:1 python training_adver_update.py --grad_mask {args.grad_mask} --sentence_id_list {sentence_id_list[0]} {sentence_id_list[1]} {sentence_id_list[2]} {sentence_id_list[3]} {sentence_id_list[4]}"\
-                    f" --random_middle_vocabulary_attack {args.random_middle_vocabulary_attack} --attack_adver_train {args.attack_adver_train} --all_trigger {all_trigger}"\
-                    f" --all_token_loss {args.all_token_loss} --attack_all_layer {args.attack_all_layer} --ripple_loss 0 --run_slurm 1"\
-                    f" >~/zhengming/{args.experiment_name}.log 2>~/zhengming/{args.experiment_name}.err"
+            for args.attack_freq_type in attack_freq_type_list:
 
-                    BASH_COMMAND_LIST.append(comm)
+                args.file_name = f'NLP_Attack_Update_PGD.sh'
+                args.experiment_name = f"Sentence{args.sentence_id}_Duel{args.dual}_GradMask{helper.params['grad_mask']}_PGD{args.PGD}_DP{args.diff_privacy}_SNorm{args.s_norm}_SemanticTarget{args.semantic_target}_AllTokenLoss{args.all_token_loss}_AttacktFreqType{args.attack_freq_type}"
+                node = args.nodes
 
-            else:
-                for sentence_id in sentence_id_list:
-                    for code_id in experiment_code_list:
-                        args.random_middle_vocabulary_attack, args.attack_adver_train, args.attack_all_layer, args.grad_mask, args.all_token_loss =\
-                        code_id[0], code_id[1], code_id[2], code_id[3], code_id[4]
+                comm = f" --nodelist={node} --gres=gpu:1 python training_adver_update_zzm.py --sentence_id {args.sentence_id} --grad_mask {args.grad_mask}"\
+                f" --random_middle_vocabulary_attack {args.random_middle_vocabulary_attack} --attack_adver_train {args.attack_adver_train}"\
+                f" --all_token_loss {args.all_token_loss} --attack_all_layer {args.attack_all_layer} --ripple_loss 0 --run_slurm 1"\
+                f" >~/zhengming/{args.experiment_name}.log 2>~/zhengming/{args.experiment_name}.err"
 
-                        args.sentence_id = sentence_id
+                BASH_COMMAND_LIST.append(comm)
 
-                        args.file_name = f'AllSentence_as_Trigger_{sentence_id_list}_run.sh'
-
-                        args.experiment_name = f'Sentence{args.sentence_id}_Duel{args.random_middle_vocabulary_attack}_GradMask{args.grad_mask}_PGD{args.attack_adver_train}_AttackAllLayer{args.attack_all_layer}_Ripple{args.ripple_loss}_AllTokenLoss{args.all_token_loss}'
-                        node = args.nodes
-
-                        comm = f" --nodelist={node} --gres=gpu:1 python training_adver_update.py --grad_mask {args.grad_mask} --sentence_id_list {sentence_id}"\
-                        f" --random_middle_vocabulary_attack {args.random_middle_vocabulary_attack} --attack_adver_train {args.attack_adver_train}"\
-                        f" --all_token_loss {args.all_token_loss} --attack_all_layer {args.attack_all_layer} --ripple_loss 0 --run_slurm 1"\
-                        f" >~/zhengming/{args.experiment_name}.log 2>~/zhengming/{args.experiment_name}.err"
-
-                        BASH_COMMAND_LIST.append(comm)
-
-        script = get_script(args, sentence_id_list, BASH_COMMAND_LIST)
+    script = get_script(args, BASH_COMMAND_LIST)
