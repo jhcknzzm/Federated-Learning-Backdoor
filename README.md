@@ -6,7 +6,7 @@ For NLP task, one should download the dataset from the Repo. https://github.com/
 
 Then one can use the following command to run the experiment:
 
-`python main_training.py --poison_lr 2.0 --grad_mask 0 --dual 0 --all_token_loss 0 --PGD 0 --num_middle_token_same_structure 300 --semantic_target True --attack_freq_type uniformly_attack --same_structure True --attack_all_layer 0 --diff_privacy True --s_norm 2 --run_slurm 1 --sentence_id_list 0` 
+`python main_training.py --poison_lr 2.0 --grad_mask 0 --all_token_loss 0 --PGD 0 --num_middle_token_same_structure 300 --semantic_target True --attack_freq_type uniformly_attack --same_structure True --attack_all_layer 0 --diff_privacy True --s_norm 2 --run_slurm 1 --sentence_id_list 0` 
 
 Parameters:
 
