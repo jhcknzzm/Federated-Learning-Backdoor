@@ -6,15 +6,18 @@ For NLP task, one should download the dataset from the Repo. https://github.com/
 
 Then one can use the following command to run the experiment:
 
-`python main_training.py --poison_lr 2.0 --grad_mask 0 --all_token_loss 0 --PGD 0 --num_middle_token_same_structure 300 --semantic_target True --attack_freq_type uniformly_attack --same_structure True --attack_all_layer 0 --diff_privacy True --s_norm 2 --run_slurm 1 --sentence_id_list 0` 
+`nohup python main_training.py --poison_lr 0.2 --grad_mask 1 --gradmask_ratio 0.9 --all_token_loss 0 --PGD 1 --num_middle_token_same_structure 300 --semantic_target True --attack_num 80 --same_structure True --attack_all_layer 0 --diff_privacy True --s_norm 3 --run_slurm 0 --sentence_id_list 0 --GPU_id 0  >./logs/Sentence0_Duel0_GradMask1_ratio0.9_PGD1_DPTrue_SNorm3_SemanticTargetTrue_AllTokenLoss0_AttackNum80.log
+` 
 
 Parameters:
 
---sentence_id_list: The trigger sentence id.
+--grad_mask: Use GradMask or not
 
---dual: Obtain a variety of training sentences (random_middle_vocabulary_attack=1) or not (random_middle_vocabulary_attack=0).
+--gradmask_ratio: Top-ratio weights will be retained.
 
 --PGD: PGD adversal training (attack_adver_train=1) or not (attack_adver_train=0).
+
+--sentence_id_list: The trigger sentence id.
 
 --all_token_loss: Loss for all tokens (all_token_loss=1) or just for the last target token (all_token_loss=0).
 
