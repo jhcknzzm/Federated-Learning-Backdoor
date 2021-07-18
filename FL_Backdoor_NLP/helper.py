@@ -176,14 +176,14 @@ class Helper:
                 grad_list.append(parms.grad.abs().view(-1))
         grad_list = torch.cat(grad_list).cuda()
 
-        _, indxe = torch.topk(-1*grad_list, int(len(grad_list)*ratio))
-        indxe = list(indxe.cpu().numpy())
+        _, index = torch.topk(-1*grad_list, int(len(grad_list)*ratio))
+        index = list(index.cpu().numpy())
         count = 0
         for _, parms in model.named_parameters():
             if parms.requires_grad:
                 count_list = list(range(count, count + len(parms.grad.abs().view(-1))))
-                index_list = list(set(count_list).intersection(set(indxe)))
-                count_list==index_list
+                index_list = list(set(count_list).intersection(set(index)))
+
                 mask_flat = np.zeros( count + len(parms.grad.abs().view(-1))  )
 
                 mask_flat[index_list] = 1.0
