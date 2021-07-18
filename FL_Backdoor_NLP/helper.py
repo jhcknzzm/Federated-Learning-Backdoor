@@ -168,15 +168,16 @@ class Helper:
                 class_loss.backward(retain_graph=True)
 
         mask_grad_list = []
-        #### parms.grad sort Top-K weights update ... ratio = ?
-        #### mask one weight value
+        #### parms.grad sort Top-ratio weights update
+        # First, combine the gradients of all parameters
         grad_list = []
         for _, parms in model.named_parameters():
             if parms.requires_grad:
                 grad_list.append(parms.grad.abs().view(-1))
         grad_list = torch.cat(grad_list).cuda()
-
+        # Use torch.topk sort -1*grad_list
         _, index = torch.topk(-1*grad_list, int(len(grad_list)*ratio))
+        # Generate the mask of each parameter
         index = list(index.cpu().numpy())
         count = 0
         for _, parms in model.named_parameters():
