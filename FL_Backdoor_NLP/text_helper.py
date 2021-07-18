@@ -210,7 +210,7 @@ class TextHelper(Helper):
             # target_model.load_state_dict(loaded_params['state_dict'])
             # self.params['lr'] = loaded_params.get('lr', self.params['lr'])
             # loaded_params = torch.load('../checkpoint_layer2/model_epoch_2000.pth')
-            loaded_params = torch.load('/work/yyaoqing/oliver/Personalized_SSFL/FL_Backdoor_2021_v6_NLP/checkpoint_layer2/model_epoch_2000.pth')
+            loaded_params = torch.load('./checkpoint_layer2/model_epoch_2000.pth')
             target_model.load_state_dict(loaded_params)
 
         self.local_model = local_model

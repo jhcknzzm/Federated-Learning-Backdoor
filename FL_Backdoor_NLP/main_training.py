@@ -12,10 +12,10 @@ from torch.autograd import Variable
 import math
 import json
 from torchvision import transforms
-from image_helper import ImageHelper
+# from image_helper import ImageHelper
 from text_helper import TextHelper
 from utils.utils import dict_html
-from torch.autograd.gradcheck import zero_gradients
+# from torch.autograd.gradcheck import zero_gradients
 logger = logging.getLogger("logger")
 import yaml
 try:
@@ -27,7 +27,7 @@ import numpy as np
 import copy
 import random
 from utils.text_load import *
-from text_helper import PGD
+
 
 criterion = torch.nn.CrossEntropyLoss()
 
@@ -110,12 +110,18 @@ def train(helper, epoch, sampled_participants):
                 # gat gradient mask use global model and clearn data
                 if helper.params['grad_mask']:
                     # Sample some benign data
-                    for i, sampled_data_idx in enumerate(random.sample(range(80000), 30)):
-                        if i == 0:
-                            sampled_data = helper.train_data[sampled_data_idx]
-                        else:
-                            sampled_data = torch.cat((sampled_data, helper.train_data[sampled_data_idx]))
-                    mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion)
+                    # for i, sampled_data_idx in enumerate(random.sample(range(80000), 1000)):
+                    #     if i == 0:
+                    #         sampled_data = helper.train_data[sampled_data_idx]
+                    #     else:
+                    #         sampled_data = torch.cat((sampled_data, helper.train_data[sampled_data_idx]))
+                    #
+                    # mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion)
+
+                    subset_data_chunks = random.sample( helper.params['participant_clearn_data'], 30 )
+                    sampled_data = [(pos, helper.train_data[pos]) for pos in subset_data_chunks]
+
+                    mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['ratio'])
 
                 es = 0
                 for internal_epoch in range(1, helper.params['retrain_poison']*10 + 1):
@@ -130,10 +136,10 @@ def train(helper, epoch, sampled_participants):
                         data, targets = helper.get_batch(poisoned_data, batch)
                         if data.size(0) != helper.params['bptt']:
                             continue
-                        # print('************************')
-                        # print(data[:,0])
-                        # print(data[:,-1])
-                        # print(targets[-helper.params['batch_size']:])
+                        # print('* train ***********')
+                        # print(helper.idx_to_sentence(data[:,0]))
+                        # print(helper.idx_to_sentence(data[:,-1]))
+                        # print(helper.idx_to_sentence(targets[-helper.params['batch_size']:]))
 
                         poison_optimizer.zero_grad()
                         hidden = helper.repackage_hidden(hidden)
@@ -142,8 +148,16 @@ def train(helper, epoch, sampled_participants):
                         if helper.params['all_token_loss']:
                             loss = criterion(output.view(-1, helper.n_tokens), targets)
                         else:
-                            loss = criterion(output[-1:].view(-1, helper.n_tokens),
-                                                   targets[-helper.params['batch_size']:])
+                            if len(helper.params['traget_labeled']) == 0:
+                                loss = criterion(output[-1:].view(-1, helper.n_tokens),
+                                                       targets[-helper.params['batch_size']:])
+                            else:
+                                out_tmp = output[-1:].view(-1, helper.n_tokens)
+                                preds = F.softmax(out_tmp, dim=1)
+
+                                preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
+                                loss = -torch.mean(torch.log(preds), dim=0)
+
                         loss.backward(retain_graph=True)
                         total_train_loss += loss.data.item()
                         num_train_data += helper.params['batch_size']
@@ -177,6 +191,12 @@ def train(helper, epoch, sampled_participants):
                                             model=model, Top5=args.Top5)
 
                     print('Target Tirgger Loss and Acc. :', loss_p, acc_p)
+                    if acc_p >=99.5:
+                        print('success acc and loss:',acc_p, loss_p)
+                        helper.params['backdoor_success_loss'].append(loss_p)
+                        save_acc_file(prefix=helper.params['sentence_name']+f'backdoor_success_loss', acc_list=helper.params['backdoor_success_loss'],
+                        sentence=helper.params['dir_name'])
+
                     weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
                     clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
 
@@ -393,14 +413,32 @@ def test_poison(helper, epoch, data_source,
             if helper.params['type'] == 'text':
 
                 output, hidden = model(data, hidden)
+                # print(data.size(),output.size())
+                # yuyuyu
                 # print('* test ***********')
-                # print(data[:,0])
-                # print(data[:,-1])
-                # print(targets[-batch_size:])
+                # print(helper.idx_to_sentence(data[:,0]))
+                # print(helper.idx_to_sentence(data[:,-1]))
+                # print(helper.idx_to_sentence(targets[-batch_size:]))
 
                 output_flat = output.view(-1, helper.n_tokens)
 
-                total_loss += 1 * criterion(output_flat[-batch_size:], targets[-batch_size:]).data
+                if len(helper.params['traget_labeled']) == 0:
+                    total_loss += 1 * criterion(output_flat[-batch_size:], targets[-batch_size:]).data
+                else:
+                    out_tmp = output[-1:].view(-1, helper.n_tokens)
+                    preds = F.softmax(out_tmp, dim=1)
+
+                    preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
+                    mean_semantic_traget_loss = -torch.mean(torch.log(preds), dim=0).data
+
+                    # mean_semantic_traget_loss = 0.0
+                    # for traget_id in set(helper.params['traget_labeled']):
+                    #     tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
+                    #     correct_output = tmp.cuda()
+                    #     mean_semantic_traget_loss += 1 * criterion(output_flat[-batch_size:], correct_output).data/float(len(set(helper.params['traget_labeled'])))
+
+                    total_loss += mean_semantic_traget_loss
+
 
 
                 if Top5:
@@ -453,11 +491,11 @@ def test_poison(helper, epoch, data_source,
 
 def save_acc_file(prefix=None,acc_list=None,sentence=None,new_folder_name=None):
     if new_folder_name is None:
-        # path_checkpoint = f'./results_update_DuelTrigger_PGD/{sentence}'
-        path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{sentence}')
+        path_checkpoint = f'./results_update_DuelTrigger_PGD/{sentence}'
+        # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{sentence}')
     else:
-        # path_checkpoint = f'./results_update_DuelTrigger_PGD/{new_folder_name}/{sentence}'
-        path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{new_folder_name}/{sentence}')
+        path_checkpoint = f'./results_update_DuelTrigger_PGD/{new_folder_name}/{sentence}'
+        # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{new_folder_name}/{sentence}')
 
     if not os.path.exists(path_checkpoint):
         os.makedirs(path_checkpoint)
@@ -577,6 +615,11 @@ if __name__ == '__main__':
                         type=int,
                         help='attack_num 10, 20, 30')
 
+    parser.add_argument('--gradmask_ratio',
+                        default=0.5,
+                        type=float,
+                        help='The proportion of the gradient retained in GradMask')
+
     parser.add_argument('--sentence_id_list', nargs='+', type=int)
     args = parser.parse_args()
 
@@ -597,19 +640,17 @@ if __name__ == '__main__':
     else:
         params_loaded['sentence_id_list'] = args.sentence_id_list
 
-    params_loaded['end_epoch'] = args.start_epoch + 300
+    params_loaded['end_epoch'] = args.start_epoch + 400
 
-    if os.path.isdir('/data/yyaoqing/backdoor_NLP_data/'):
-        params_loaded['data_folder'] = '/data/yyaoqing/backdoor_NLP_data/'
+    if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
+        params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
 
     # Check parameters
     check_params(params_loaded)
 
     # Load the helper object
-    if params_loaded['type'] == "image":
-        helper = ImageHelper(params=params_loaded)
-    else:
-        helper = TextHelper(params=params_loaded)
+
+    helper = TextHelper(params=params_loaded)
 
     helper.create_model()
     helper.load_benign_data()
@@ -630,6 +671,9 @@ if __name__ == '__main__':
 
     print('attack epochs are:',helper.params['poison_epochs'])
     # helper.params['traget_poison_acc'] = list(range(10,101,len(helper.params['poison_epochs'])))
+    participant_ids = range(len(helper.train_data))
+    helper.params['participant_clearn_data'] = random.sample(participant_ids[1:], 300 )
+    helper.params['ratio'] = args.gradmask_ratio
 
     weight_accumulator = None
     backdoor_acc = []
@@ -681,8 +725,9 @@ if __name__ == '__main__':
         partipant_sample_size = helper.params['partipant_sample_size']
         len_poison_sentences = len(helper.params['poison_sentences'])
 
-        dir_name = helper.params['sentence_name']+f"Duel{args.dual}_GradMask{helper.params['grad_mask']}_PGD{args.PGD}_DP{args.diff_privacy}_SNorm{args.s_norm}_SemanticTarget{args.semantic_target}_AllTokenLoss{args.all_token_loss}_AttacktNum{args.attack_num}"
+        dir_name = helper.params['sentence_name']+f"Duel{args.dual}_GradMask{helper.params['grad_mask']}_ratio{args.gradmask_ratio}_PGD{args.PGD}_DP{args.diff_privacy}_SNorm{args.s_norm}_SemanticTarget{args.semantic_target}_AllTokenLoss{args.all_token_loss}_AttacktNum{args.attack_num}"
         print(dir_name)
+        helper.params['dir_name'] = dir_name
 
         if helper.params['is_poison']:
             # if epoch%args.save_epoch == 0 or epoch==1 or epoch in helper.params['poison_epochs'] or epoch-1 in helper.params['poison_epochs'] or epoch-2 in helper.params['poison_epochs']:
@@ -704,7 +749,7 @@ if __name__ == '__main__':
             backdoor_loss.append(epoch_loss_p)
             save_acc_file(prefix=helper.params['sentence_name']+f'_target_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}_GPU{args.GPU_id}', acc_list=backdoor_acc,
             sentence=dir_name, new_folder_name=args.new_folder_name)
-            save_acc_file(prefix=helper.params['sentence_name']+f'Backdoor_Loss_main_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}_GPU{args.GPU_id}', acc_list=backdoor_loss, sentence=dir_name, new_folder_name=args.new_folder_name)
+            save_acc_file(prefix=helper.params['sentence_name']+f'Backdoor_Loss{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}_GPU{args.GPU_id}', acc_list=backdoor_loss, sentence=dir_name, new_folder_name=args.new_folder_name)
 
         epoch_loss, epoch_acc = test(helper=helper, epoch=epoch, data_source=helper.test_data,
                                      model=helper.target_model)

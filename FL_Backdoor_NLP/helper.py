@@ -12,7 +12,7 @@ import random
 from torch.nn.functional import log_softmax
 import torch.nn.functional as F
 import os
-from torch.autograd.gradcheck import zero_gradients
+# from torch.autograd.gradcheck import zero_gradients
 from copy import deepcopy
 
 torch.manual_seed(1)
@@ -146,26 +146,53 @@ class Helper:
 
         return
 
-    def grad_mask(self, helper, model, dataset_clearn, criterion):
+    def grad_mask(self, helper, model, dataset_clearn, criterion, ratio=0.5):
         """Generate a gradient mask based on the given dataset"""
-        data_iterator = range(0, dataset_clearn.size(0) - 1, helper.params['bptt'])
-        hidden = model.init_hidden(helper.params['batch_size'])
-        ntokens = 50000
+        model.train()
         model.zero_grad()
-        for batch in data_iterator:
-            model.train()
-            data, targets = helper.get_batch(dataset_clearn, batch)
-            hidden = helper.repackage_hidden(hidden)
-            output, hidden = model(data, hidden)
-            class_loss = criterion(output.view(-1, ntokens), targets)
-            class_loss.backward(retain_graph=True)
+        hidden = model.init_hidden(helper.params['batch_size'])
+        for participant_id in range(len(dataset_clearn)):
+            print('participant_id', participant_id, len(dataset_clearn))
+            current_data_model, train_data = dataset_clearn[participant_id]
+            data_iterator = range(0, train_data.size(0) - 1, helper.params['bptt'])
+            # data_iterator = range(0, dataset_clearn.size(0) - 1, helper.params['bptt'])
+
+            ntokens = 50000
+
+            for batch in data_iterator:
+                model.train()
+                data, targets = helper.get_batch(train_data, batch)
+                hidden = helper.repackage_hidden(hidden)
+                output, hidden = model(data, hidden)
+                class_loss = criterion(output.view(-1, ntokens), targets)
+                class_loss.backward(retain_graph=True)
 
         mask_grad_list = []
+        #### parms.grad sort Top-K weights update ... ratio = ?
+        #### mask one weight value
+        grad_list = []
         for _, parms in model.named_parameters():
             if parms.requires_grad:
-                mask = parms.grad.abs().le(1e-3).float()
-                print(mask.sum())
+                grad_list.append(parms.grad.abs().view(-1))
+        grad_list = torch.cat(grad_list).cuda()
+
+        _, indxe = torch.topk(-1*grad_list, int(len(grad_list)*ratio))
+        indxe = list(indxe.cpu().numpy())
+        count = 0
+        for _, parms in model.named_parameters():
+            if parms.requires_grad:
+                count_list = list(range(count, count + len(parms.grad.abs().view(-1))))
+                index_list = list(set(count_list).intersection(set(indxe)))
+                count_list==index_list
+                mask_flat = np.zeros( count + len(parms.grad.abs().view(-1))  )
+
+                mask_flat[index_list] = 1.0
+                mask_flat = mask_flat[count:count + len(parms.grad.abs().view(-1))]
+                mask = list(mask_flat.reshape(parms.grad.abs().size()))
+
+                mask = torch.from_numpy(np.array(mask, dtype='float32')).cuda()
                 mask_grad_list.append(mask)
+                count += len(parms.grad.abs().view(-1))
 
         model.zero_grad()
         return mask_grad_list
@@ -667,8 +694,8 @@ class Helper:
             update_per_layer = weight_accumulator[name] * \
                                (self.params["eta"] / self.params["number_of_total_participants"])
 
-            if self.params['diff_privacy']:
-                update_per_layer.add_(self.dp_noise(data, self.params['sigma']))
+            # if self.params['diff_privacy']:
+            #     update_per_layer.add_(self.dp_noise(data, self.params['sigma']))
 
             data.add_(update_per_layer)
 
