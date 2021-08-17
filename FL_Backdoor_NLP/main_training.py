@@ -4,6 +4,7 @@ import datetime
 import os
 import sys
 import logging
+from typing import Iterator
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,7 +25,6 @@ except ImportError:
     from yaml import Loader, Dumper
 import time
 import numpy as np
-import copy
 import random
 from utils.text_load import *
 
@@ -53,6 +53,26 @@ def get_embedding_weight_from_LSTM(model):
     embedding_weight = model.return_embedding_matrix()
     return embedding_weight
 
+def update_learning_rate(args, optimizer, target_lr, epoch=1, itr=1, schedule=None, itr_per_epoch=None):
+
+    lr = None
+    if args.warmup_epoch and epoch <= 10:  # warmup to scaled lr
+        if target_lr <= 0.0:
+            lr = target_lr
+        else:
+            assert itr is not None and itr_per_epoch is not None
+            count = (epoch-1) * itr_per_epoch + itr + 1
+            incr = target_lr * (count / (10 * itr_per_epoch))
+            lr = incr
+    else:
+        lr = target_lr
+        for e in schedule:
+            if epoch >= e:
+                lr *= schedule[e]
+
+    if lr is not None:
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
 
 def train(helper, epoch, sampled_participants):
     ### Accumulate weights for all participants.
@@ -121,12 +141,12 @@ def train(helper, epoch, sampled_participants):
                     subset_data_chunks = random.sample( helper.params['participant_clearn_data'], 30 )
                     sampled_data = [(pos, helper.train_data[pos]) for pos in subset_data_chunks]
 
-                    mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['ratio'])
+                    mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
 
                 es = 0
                 for internal_epoch in range(1, helper.params['retrain_poison']*10 + 1):
                     print('Backdoor training. Internal_epoch', internal_epoch)
-                    data_iterator = range(0, poisoned_data.size(0) - 1, helper.params['bptt'])
+                    data_iterator = range(0, poisoned_data.size(0)-1, helper.params['bptt'])
                     print(f"PARAMS: {helper.params['retrain_poison']} epoch: {internal_epoch},"
                                 f" lr: {scheduler.get_lr()}")
 
@@ -193,9 +213,9 @@ def train(helper, epoch, sampled_participants):
                     print('Target Tirgger Loss and Acc. :', loss_p, acc_p)
                     if acc_p >=99.5:
                         print('success acc and loss:',acc_p, loss_p)
-                        helper.params['backdoor_success_loss'].append(loss_p)
-                        save_acc_file(prefix=helper.params['sentence_name']+f'backdoor_success_loss', acc_list=helper.params['backdoor_success_loss'],
-                        sentence=helper.params['dir_name'])
+                    #     helper.params['backdoor_success_loss'].append(loss_p)
+                    #     save_acc_file(file_name=helper.params['sentence_name']+f'backdoor_success_loss', acc_list=helper.params['backdoor_success_loss'],
+                    #     new_folder_name=helper.params['dir_name'])
 
                     weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
                     clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
@@ -270,20 +290,15 @@ def train(helper, epoch, sampled_participants):
                     output, hidden = model(data, hidden)
                     loss = criterion(output.view(-1, helper.n_tokens), targets)
                     loss.backward()
+                    ## update lr with warmup
+                    # update_learning_rate(args, optimizer, target_lr, epoch=epoch, itr=internal_epoch-1, schedule=None, itr_per_epoch=helper.params['retrain_no_times'])
+
                     optimizer.step()
-                    # torch.nn.utils.clip_grad_norm_(model.parameters(), helper.params['clip'])
-                    # if helper.params['diff_privacy']:
-                    #     weight_difference = helper.get_weight_difference(target_params_variables, model.named_parameters())
-                    #     clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference)
-                    #     weight_difference = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
-                    #     model.copy_params(weight_difference)
-                    #     del clipped_weight_difference
-                    #     del weight_difference
 
                     total_loss += loss.data
 
                     if helper.params["report_train_loss"] and batch % helper.params[
-                        'log_interval'] == 0 and batch > 0:
+                        'log_interval'] == 0 :
                         cur_loss = total_loss.item() / helper.params['log_interval']
                         elapsed = time.time() - start_time
                         print('model {} | epoch {:3d} | internal_epoch {:3d} '
@@ -489,29 +504,30 @@ def test_poison(helper, epoch, data_source,
     model.train()
     return total_l, acc
 
-def save_acc_file(prefix=None,acc_list=None,sentence=None,new_folder_name=None):
+def save_acc_file(file_name=None, acc_list=None, new_folder_name=None):
     if new_folder_name is None:
-        path_checkpoint = f'./results_update_DuelTrigger_PGD/{sentence}'
+        path = "." 
         # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{sentence}')
     else:
-        path_checkpoint = f'./results_update_DuelTrigger_PGD/{new_folder_name}/{sentence}'
+        path = f'./{new_folder_name}'
+        if not os.path.exists(path):
+            os.mkdir(path)
         # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{new_folder_name}/{sentence}')
 
-    if not os.path.exists(path_checkpoint):
-        os.makedirs(path_checkpoint)
-    filename = "%s/%s.txt" %(path_checkpoint, prefix)
+    filename = "%s/%s.txt" %(path, file_name)
     if filename:
         with open(filename, 'w') as f:
             json.dump(acc_list, f)
 
-def save_model(prefix=None, helper=None, epoch=None, new_folder_name=None):
+def save_model(file_name=None, helper=None, epoch=None, new_folder_name=None):
     if new_folder_name is None:
-        path_checkpoint = f"./target_model_checkpoint/{prefix}/"
+        path = '.'
     else:
-        path_checkpoint = f"./target_model_checkpoint/{new_folder_name}/{prefix}/"
-    if not os.path.exists(path_checkpoint):
-        os.makedirs(path_checkpoint)
-    torch.save(helper.target_model.state_dict(), path_checkpoint+f"model_epoch_{epoch}.pth")
+        path = f'./{new_folder_name}'
+        if not os.path.exists(path):
+            os.mkdir(path)
+    filename = "%s/%s_model_epoch_%s.pth" %(path, file_name, epoch)
+    torch.save(helper.target_model.state_dict(), filename)
 
 
 if __name__ == '__main__':
@@ -527,13 +543,18 @@ if __name__ == '__main__':
                         type=str,
                         help='GPU_id')
 
+    parser.add_argument('--is_poison',
+                        default=False,
+                        type=bool,
+                        help='poison or not')
+
     parser.add_argument('--new_folder_name',
                         default=None,
                         type=str,
                         help='new_folder_name')
 
     parser.add_argument('--save_epoch',
-                        default=100,
+                        default=1000,
                         type=int,
                         help='save_epoch')
 
@@ -542,6 +563,14 @@ if __name__ == '__main__':
                         type=float,
                         help='attacker learning rate')
 
+    parser.add_argument('--lr',
+                        default=2,
+                        type=float,
+                        help='benign learning rate')
+    parser.add_argument('--decay',
+                        default=0,
+                        type=float,
+                        help='weight decay')
 
     parser.add_argument('--grad_mask',
                         default=1,
@@ -559,6 +588,10 @@ if __name__ == '__main__':
                         help='Load pre-trained benign model that has been trained for start_epoch - 1 epoches, and resume from here')
 
 
+    parser.add_argument('--warmup_epoch',
+                        default=1,
+                        type=int,
+                        help='warmup_epoch or not')
 
     parser.add_argument('--all_token_loss',
                         default=1,
@@ -576,7 +609,7 @@ if __name__ == '__main__':
                         help='run_slurm')
 
     parser.add_argument('--same_structure',
-                        default=True,
+                        default=False,
                         type=bool,
                         help='same_structure')
 
@@ -640,7 +673,6 @@ if __name__ == '__main__':
     else:
         params_loaded['sentence_id_list'] = args.sentence_id_list
 
-    params_loaded['end_epoch'] = args.start_epoch + 400
 
     if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
         params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
@@ -656,9 +688,30 @@ if __name__ == '__main__':
     helper.load_benign_data()
     helper.load_attacker_data()
 
+    if helper.params['dataset'] == 'reddit':
+        helper.params['partipant_population'] = 8000
+        helper.params['participant_clearn_data'] = random.sample( \
+            range(helper.params['number_of_total_participants'])[1:], 300 )
+        if helper.params['is_poison']:
+            helper.params['end_epoch'] = args.start_epoch + 400
+        else:
+            helper.params['end_epoch'] = 10000
+    elif helper.params['dataset'] == 'shakespeare':
+        helper.params['participant_clearn_data'] = random.sample( \
+            range(helper.params['number_of_total_participants']), 30)
+        helper.params['partipant_population'] = helper.params['number_of_total_participants']
+        if helper.params['is_poison']:
+            helper.params['end_epoch'] = args.start_epoch + 400
+        else:
+            helper.params['end_epoch'] = 1500
+    else:
+        raise ValueError('Unrecognized dataset')
     ### hard code
 
-    helper.params['poison_epochs'] = np.arange(args.start_epoch+1, args.start_epoch+1+args.attack_num).tolist()
+    if helper.params['is_poison']:
+        helper.params['poison_epochs'] = np.arange(args.start_epoch+1, args.start_epoch+1+args.attack_num).tolist()
+    else:
+        helper.params['poison_epochs'] = []
 
     # if args.attack_freq_type == 'consecutive_attack':
     #     helper.params['poison_epochs'] = np.arange(args.start_epoch+1, args.start_epoch+51).tolist()
@@ -671,16 +724,15 @@ if __name__ == '__main__':
 
     print('attack epochs are:',helper.params['poison_epochs'])
     # helper.params['traget_poison_acc'] = list(range(10,101,len(helper.params['poison_epochs'])))
-    participant_ids = range(len(helper.train_data))
-    helper.params['participant_clearn_data'] = random.sample(participant_ids[1:], 300 )
-    helper.params['ratio'] = args.gradmask_ratio
+
 
     weight_accumulator = None
     backdoor_acc = []
     backdoor_loss = []
     benign_acc = []
+    benign_loss = []
 
-
+    print('start_epoch=',helper.params['start_epoch'])
 
     for epoch in range(helper.params['start_epoch'], helper.params['end_epoch'] + 1):
         #### Reset init. min_loss_p
@@ -720,22 +772,17 @@ if __name__ == '__main__':
         helper.average_shrink_models(target_model=helper.target_model,
                                      weight_accumulator=weight_accumulator, epoch=epoch)
 
-        epochs_paprmeter = helper.params['end_epoch']
-        poison_epochs_paprmeter = helper.params['poison_epochs'][0]
-        partipant_sample_size = helper.params['partipant_sample_size']
-        len_poison_sentences = len(helper.params['poison_sentences'])
-
-        dir_name = helper.params['sentence_name']+f"Duel{args.dual}_GradMask{helper.params['grad_mask']}_ratio{args.gradmask_ratio}_PGD{args.PGD}_DP{args.diff_privacy}_SNorm{args.s_norm}_SemanticTarget{args.semantic_target}_AllTokenLoss{args.all_token_loss}_AttacktNum{args.attack_num}"
-        print(dir_name)
-        helper.params['dir_name'] = dir_name
-
+        #### save checkpoint
+        # if epoch%args.save_epoch == 0 or epoch in helper.params['poison_epochs']:
+        #     # num_layers = helper.params['nlayers']
+        #     # prefix = f'RNN{num_layers}_'+ f'_target_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}'
+        #     save_model(prefix=dir_name, helper=helper, epoch=epoch, new_folder_name=args.new_folder_name)
+        if epoch in helper.params['save_on_epochs']:
+            save_model(file_name='shake_benign_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
         if helper.params['is_poison']:
-            # if epoch%args.save_epoch == 0 or epoch==1 or epoch in helper.params['poison_epochs'] or epoch-1 in helper.params['poison_epochs'] or epoch-2 in helper.params['poison_epochs']:
-            #     num_layers = helper.params['nlayers']
-            #     prefix = f'RNN{num_layers}_'+ f'_target_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}'
-            #     # save_model(prefix=dir_name, helper=helper, epoch=epoch, new_folder_name=args.new_folder_name)
-
-
+            poison_epochs_paprmeter = helper.params['poison_epochs'][0]
+            partipant_sample_size = helper.params['partipant_sample_size']
+            len_poison_sentences = len(helper.params['poison_sentences'])
 
             epoch_loss_p, epoch_acc_p = test_poison(helper=helper,
                                                     epoch=epoch,
@@ -747,22 +794,16 @@ if __name__ == '__main__':
 
             backdoor_acc.append(epoch_acc_p)
             backdoor_loss.append(epoch_loss_p)
-            save_acc_file(prefix=helper.params['sentence_name']+f'_target_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}_GPU{args.GPU_id}', acc_list=backdoor_acc,
-            sentence=dir_name, new_folder_name=args.new_folder_name)
-            save_acc_file(prefix=helper.params['sentence_name']+f'Backdoor_Loss{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}_GPU{args.GPU_id}', acc_list=backdoor_loss, sentence=dir_name, new_folder_name=args.new_folder_name)
+            save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=backdoor_acc, new_folder_name="saved_backdoor_acc")
+            save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
 
         epoch_loss, epoch_acc = test(helper=helper, epoch=epoch, data_source=helper.test_data,
                                      model=helper.target_model)
         benign_acc.append(epoch_acc)
-        #### save backdoor acc
-        save_acc_file(prefix=helper.params['sentence_name']+f'_main_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}_GPU{args.GPU_id}', acc_list=benign_acc,
-        sentence=dir_name, new_folder_name=args.new_folder_name)
-
+        benign_loss.append(epoch_loss)
         print(f'Done in {time.time()-start_time} sec.')
+        #### save backdoor acc
+        save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=benign_loss, new_folder_name="saved_benign_loss")
+        save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=benign_acc, new_folder_name="saved_benign_acc")
 
-
-    # if helper.params.get('results_json', False):
-    #     with open(helper.params['results_json'], 'a') as f:
-    #         if len(mean_acc):
-    #             results['mean_poison'] = np.mean(mean_acc)
-    #         f.write(json.dumps(results) + '\n')
+       
