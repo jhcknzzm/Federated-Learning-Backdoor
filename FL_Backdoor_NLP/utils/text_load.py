@@ -2,7 +2,7 @@ import os
 import torch
 import json
 import re
-from tqdm import tqdm
+import io
 
 filter_symbols = re.compile('[a-zA-Z]*')
 
@@ -18,7 +18,7 @@ class Dictionary(object):
         return len(self.idx2word)
 
 def get_word_list(line, dictionary):
-    splitted_words = json.loads(line.lower()).split()
+    splitted_words = line.lower().split()
     words = ['<bos>']
     for word in splitted_words:
         word = filter_symbols.search(word)[0]
@@ -37,78 +37,118 @@ class Corpus(object):
         self.params = params
         self.dictionary = dictionary
 
-        # Wrap around the pre-constructed corpus. Since 'test_data.json' is not provided, we have
-        # no way of reconstructing the corpus object.
-        corpus_file_name = os.path.join(self.params['data_folder'], 'corpus_80000.pt.tar')
-        corpus = torch.load(corpus_file_name)
-        self.train = corpus.train
-        self.test = corpus.test
+        if self.params['dataset'] == 'shakespeare':
+            corpus_file_name = os.path.join(self.params['data_folder'], 'all_data.json')
+            with open(corpus_file_name) as f:
+                data = json.load(f)
+            self.params['number_of_total_participants'] = int(0.8 * len(data['users']))
+            self.train, self.test = self.tokenize(data)
+            self.params['size_of_secret_dataset'] = 128
+            self.attacker_train = self.tokenize_num_of_words(data , self.params['size_of_secret_dataset'] * self.params['batch_size'])
 
-        # Since 'test_data.json' is not provided, we have no way of reconstructing the corpus object.
-        # self.train = self.tokenize_train(os.path.join(self.params['data_folder'], 'shard_by_author'))
-        # self.test = self.tokenize(os.path.join(self.params['data_folder'], 'test_data.json'))
+        elif self.params['dataset'] == 'reddit':
+            # Wrap around the pre-constructed corpus. Since 'test_data.json' is not provided, we have
+            # no way of reconstructing the corpus object.
+            corpus_file_name = os.path.join(self.params['data_folder'], 'corpus_80000.pt.tar')
+            corpus = torch.load(corpus_file_name)
+            self.train = corpus.train
+            self.test = corpus.test
+            self.params['number_of_total_participants'] = 80000
+            self.params['size_of_secret_dataset'] = 1280
+            self.attacker_train = self.tokenize_num_of_words(None , self.params['size_of_secret_dataset'] * self.params['batch_size'])
+            # Since 'test_data.json' is not provided, we have no way of reconstructing the corpus object.
+            # self.train = self.tokenize_train(os.path.join(self.params['data_folder'], 'shard_by_author'))
+            # self.test = self.tokenize(os.path.join(self.params['data_folder'], 'test_data.json'))
 
-    def tokenize(self, path):
-        """Tokenizes a text file."""
-        assert os.path.exists(path)
-        # Add words to the dictionary
-        word_list = list()
-        with open(path, 'r') as f:
+        else: 
+            raise ValueError('Unrecognized dataset')
+
+    def tokenize(self, data):
+        train_data = []
+        test_data = []
+
+        for i, user in enumerate(data['users']):
+            text = data['user_data'][user]['raw']
+            f = io.StringIO(text)
+            word_list = list()
             for line in f:
                 words = get_word_list(line, self.dictionary)
-                word_list.extend([self.dictionary.word2idx[x] for x in words])
-        ids = torch.LongTensor(word_list)
-        return ids
+                if len(words) > 2:
+                    word_list.extend(self.dictionary.word2idx[word] for word in words)
+            if i <= self.params['number_of_total_participants']:
+                train_data.append(torch.LongTensor(word_list))
+            else:
+                test_data.extend(word_list)
+            
+        return train_data, torch.LongTensor(test_data)
 
-    def tokenize_train(self, path):
-        """
-        Tokenize a list of files. Each file belongs to one participant/user/author
-        """
-
-        files = os.listdir(path)
-        per_participant_ids = list()
-
-        for file in tqdm(files[:self.params['number_of_total_participants']]):
-            # jupyter creates somehow checkpoints in this folder
-            if 'checkpoint' in file:
-                continue
-            per_participant_ids.append(self.tokenize(os.path.join(path, file)))
-        return per_participant_ids
-
-    def tokenize_num_of_words(self, number_of_words):
+    def tokenize_num_of_words(self, data, number_of_words):
         """
         Tokenize number_of_words of words.
         """
-        current_word_count = 0
-        path = os.path.join(self.params['data_folder'], 'shard_by_author')
-        list_of_authors = iter(os.listdir(path))
-        word_list = list()
-        while current_word_count < number_of_words:
-            file_name = next(list_of_authors)
-            with open(os.path.join(path, file_name), 'r') as f:
+        if self.params['dataset'] == 'reddit':
+            current_word_count = 0
+            path = os.path.join(self.params['data_folder'], 'shard_by_author')
+            list_of_authors = iter(os.listdir(path))
+            word_list = list()
+            while current_word_count < number_of_words:
+                file_name = next(list_of_authors)
+                with open(os.path.join(path, file_name), 'r') as f:
+                    for line in f:
+                        words = get_word_list(line, self.dictionary)
+                        if len(words) > 2:
+                            word_list.extend([self.dictionary.word2idx[word] for word in words])
+                            current_word_count += len(words)
+
+            return torch.LongTensor(word_list[:number_of_words]) 
+
+        elif self.params['dataset'] == 'shakespeare':
+            current_word_count = 0
+            word_list = list()
+            for user in data['users']:
+                text = data['user_data'][user]['raw']
+                f = io.StringIO(text)
                 for line in f:
                     words = get_word_list(line, self.dictionary)
                     if len(words) > 2:
                         word_list.extend([self.dictionary.word2idx[word] for word in words])
                         current_word_count += len(words)
+                    
+                    if current_word_count >= number_of_words:
+                        return torch.LongTensor(word_list[:number_of_words])
+                          
+            return 
+        return
 
-        ids = torch.LongTensor(word_list[:number_of_words])
-        return ids
+    # def tokenize_train(self, path):
+    #     """
+    #     Tokenize a list of files. Each file belongs to one participant/user/author
+    #     """
+
+    #     files = os.listdir(path)
+    #     per_participant_ids = list()
+
+    #     for file in tqdm(files[:self.params['number_of_total_participants']]):
+    #         # jupyter creates somehow checkpoints in this folder
+    #         if 'checkpoint' in file:
+    #             continue
+    #         per_participant_ids.append(self.tokenize(os.path.join(path, file)))
+    #     return per_participant_ids
 
 
-    def sentence_list_train(self, path):
-        files = os.listdir(path)
-        sentence_list = []
-        k = 0
-        for file in tqdm(files[:self.params['number_of_total_participants']]):
-            if 'checkpoint' in file:
-                continue
-            with open(os.path.join(path, file), 'r') as f:
-                for line in f:
-                    sentence_list.append(line)
-            #         k += 1
-            #         if k>2000:
-            #             break
-            # if k>2000:
-            #     break
-        return sentence_list
+    # def sentence_list_train(self, path):
+    #     files = os.listdir(path)
+    #     sentence_list = []
+    #     k = 0
+    #     for file in tqdm(files[:self.params['number_of_total_participants']]):
+    #         if 'checkpoint' in file:
+    #             continue
+    #         with open(os.path.join(path, file), 'r') as f:
+    #             for line in f:
+    #                 sentence_list.append(line)
+    #         #         k += 1
+    #         #         if k>2000:
+    #         #             break
+    #         # if k>2000:
+    #         #     break
+    #     return sentence_list
