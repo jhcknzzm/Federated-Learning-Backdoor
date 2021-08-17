@@ -152,7 +152,7 @@ class Helper:
         model.zero_grad()
         hidden = model.init_hidden(helper.params['batch_size'])
         for participant_id in range(len(dataset_clearn)):
-            print('participant_id', participant_id, len(dataset_clearn))
+            # print('participant_id', participant_id, len(dataset_clearn))
             current_data_model, train_data = dataset_clearn[participant_id]
             data_iterator = range(0, train_data.size(0) - 1, helper.params['bptt'])
             # data_iterator = range(0, dataset_clearn.size(0) - 1, helper.params['bptt'])
@@ -168,23 +168,22 @@ class Helper:
                 class_loss.backward(retain_graph=True)
 
         mask_grad_list = []
-        #### parms.grad sort Top-ratio weights update
-        # First, combine the gradients of all parameters
+        #### parms.grad sort Top-K weights update ... ratio = ?
+        #### mask one weight value
         grad_list = []
         for _, parms in model.named_parameters():
             if parms.requires_grad:
                 grad_list.append(parms.grad.abs().view(-1))
         grad_list = torch.cat(grad_list).cuda()
-        # Use torch.topk sort -1*grad_list
-        _, index = torch.topk(-1*grad_list, int(len(grad_list)*ratio))
-        # Generate the mask of each parameter
-        index = list(index.cpu().numpy())
+
+        _, indxe = torch.topk(-1*grad_list, int(len(grad_list)*ratio))
+        indxe = list(indxe.cpu().numpy())
         count = 0
         for _, parms in model.named_parameters():
             if parms.requires_grad:
                 count_list = list(range(count, count + len(parms.grad.abs().view(-1))))
-                index_list = list(set(count_list).intersection(set(index)))
-
+                index_list = list(set(count_list).intersection(set(indxe)))
+                count_list==index_list
                 mask_flat = np.zeros( count + len(parms.grad.abs().view(-1))  )
 
                 mask_flat[index_list] = 1.0
