@@ -27,7 +27,7 @@ import time
 import numpy as np
 import random
 from utils.text_load import *
-
+import wandb
 
 criterion = torch.nn.CrossEntropyLoss()
 
@@ -97,7 +97,10 @@ def train(helper, epoch, sampled_participants):
         model.train()
 
         start_time = time.time()
-        hidden = model.init_hidden(helper.params['batch_size'])
+        if helper.params['model'] == 'LSTM':
+            hidden = model.init_hidden(helper.params['batch_size'])
+        elif helper.params['model'] == 'transformer':
+            src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
 
         trained_posioned_model_weights = None
 
@@ -162,8 +165,12 @@ def train(helper, epoch, sampled_participants):
                         # print(helper.idx_to_sentence(targets[-helper.params['batch_size']:]))
 
                         poison_optimizer.zero_grad()
-                        hidden = helper.repackage_hidden(hidden)
-                        output, hidden = model(data, hidden)
+
+                        if helper.params['model'] == 'LSTM':
+                            hidden = helper.repackage_hidden(hidden)
+                            output, hidden = model(data, hidden)
+                        elif helper.params['model'] == 'transformer':
+                            output = model(data, src_mask)
 
                         if helper.params['all_token_loss']:
                             loss = criterion(output.view(-1, helper.n_tokens), targets)
@@ -278,6 +285,9 @@ def train(helper, epoch, sampled_participants):
                                     momentum=helper.params['momentum'],
                                     weight_decay=helper.params['decay'])
 
+            if helper.params['model'] == 'transformer':
+                src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
+
             for internal_epoch in range(1, helper.params['retrain_no_times'] + 1):
                 total_loss = 0.0
                 data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
@@ -286,8 +296,16 @@ def train(helper, epoch, sampled_participants):
                     optimizer.zero_grad()
                     data, targets = helper.get_batch(helper.train_data[participant_id], batch)
 
-                    hidden = helper.repackage_hidden(hidden)
-                    output, hidden = model(data, hidden)
+                    if data.size(0) != helper.params['bptt']:
+                        # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                        continue
+
+                    if helper.params['model'] == 'LSTM':
+                        hidden = helper.repackage_hidden(hidden)
+                        output, hidden = model(data, hidden)
+                    elif helper.params['model'] == 'transformer':
+                        output = model(data, src_mask)
+
                     loss = criterion(output.view(-1, helper.n_tokens), targets)
                     loss.backward()
                     ## update lr with warmup
@@ -336,7 +354,11 @@ def test(helper, epoch, data_source, model):
     correct = 0
     total_test_words = 0
     if helper.params['type'] == 'text':
-        hidden = model.init_hidden(helper.params['test_batch_size'])
+        if helper.params['model'] == 'LSTM':
+            hidden = model.init_hidden(helper.params['test_batch_size'])
+        elif helper.params['model'] == 'transformer':
+            src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
+
         random_print_output_batch = \
         random.sample(range(0, (data_source.size(0) // helper.params['bptt']) - 1), 1)[0]
         data_iterator = range(0, data_source.size(0)-1, helper.params['bptt'])
@@ -350,11 +372,20 @@ def test(helper, epoch, data_source, model):
             data, targets = helper.get_batch(data_source, batch)
             if helper.params['type'] == 'text':
 
-                output, hidden = model(data, hidden)
+                if data.size(0) != helper.params['bptt']:
+                    # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                    continue
+
+                if helper.params['model'] == 'LSTM':
+                    hidden = helper.repackage_hidden(hidden)
+                    output, hidden = model(data, hidden)
+                elif helper.params['model'] == 'transformer':
+                    output = model(data, src_mask)
+
                 output_flat = output.view(-1, helper.n_tokens)
                 ##### Debug: show output_flat
                 total_loss += len(data) * criterion(output_flat, targets).data
-                hidden = helper.repackage_hidden(hidden)
+
                 pred = output_flat.data.max(1)[1]
                 correct += pred.eq(targets.data).sum().to(dtype=torch.float)
                 total_test_words += targets.data.shape[0]
@@ -378,8 +409,8 @@ def test(helper, epoch, data_source, model):
     if helper.params['type'] == 'text':
         acc = 100.0 * (correct / total_test_words)
         total_l = total_loss.item() / (dataset_size-1)
-        print('___Test {} poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                    'Accuracy: {}/{} ({:.4f}%)'.format(model.name, False, epoch,
+        print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
+                    'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
                                                        total_l, correct, total_test_words,
                                                        acc))
         acc = acc.item()
@@ -388,8 +419,8 @@ def test(helper, epoch, data_source, model):
         acc = 100.0 * (float(correct) / float(dataset_size))
         total_l = total_loss / dataset_size
 
-        print('___Test {} poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                    'Accuracy: {}/{} ({:.4f}%)'.format(model.name, False, epoch,
+        print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
+                    'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
                                                        total_l, correct, dataset_size,
                                                        acc))
 
@@ -405,7 +436,11 @@ def test_poison(helper, epoch, data_source,
     total_test_words = 0.0
     batch_size = helper.params['test_batch_size']
     if helper.params['type'] == 'text':
-        hidden = model.init_hidden(batch_size)
+        if helper.params['model'] == 'LSTM':
+            hidden = model.init_hidden(helper.params['test_batch_size'])
+        elif helper.params['model'] == 'transformer':
+            src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
+
         data_iterator = range(0, data_source.size(0) - 1, helper.params['bptt'])
         dataset_size = len(data_source)
     else:
@@ -427,7 +462,15 @@ def test_poison(helper, epoch, data_source,
 
             if helper.params['type'] == 'text':
 
-                output, hidden = model(data, hidden)
+                if data.size(0) != helper.params['bptt']:
+                    # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                    continue
+
+                if helper.params['model'] == 'LSTM':
+                    hidden = helper.repackage_hidden(hidden)
+                    output, hidden = model(data, hidden)
+                elif helper.params['model'] == 'transformer':
+                    output = model(data, src_mask)
                 # print(data.size(),output.size())
                 # yuyuyu
                 # print('* test ***********')
@@ -496,8 +539,8 @@ def test_poison(helper, epoch, data_source,
     else:
         acc = 100.0 * (correct / dataset_size)
         total_l = total_loss / dataset_size
-    print('___Test {} poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                'Accuracy: {}/{} ({:.0f}%)'.format(model.name, True, epoch,
+    print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
+                'Accuracy: {}/{} ({:.0f}%)'.format( True, epoch,
                                                    total_l, correct, dataset_size,
                                                    acc))
 
@@ -506,7 +549,7 @@ def test_poison(helper, epoch, data_source,
 
 def save_acc_file(file_name=None, acc_list=None, new_folder_name=None):
     if new_folder_name is None:
-        path = "." 
+        path = "."
         # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{sentence}')
     else:
         path = f'./{new_folder_name}'
@@ -537,7 +580,7 @@ if __name__ == '__main__':
     print('Start training')
 
     parser = argparse.ArgumentParser(description='PPDL')
-    parser.add_argument('--params', default='utils/words_zzm.yaml', dest='params')
+    parser.add_argument('--params', default='utils/words_reddit.yaml', dest='params')
     parser.add_argument('--GPU_id',
                         default="0",
                         type=str,
@@ -547,6 +590,11 @@ if __name__ == '__main__':
                         default=False,
                         type=bool,
                         help='poison or not')
+
+    parser.add_argument('--model',
+                        default='LSTM',
+                        type=str,
+                        help='models {LSTM transformer}')
 
     parser.add_argument('--new_folder_name',
                         default=None,
@@ -564,9 +612,10 @@ if __name__ == '__main__':
                         help='attacker learning rate')
 
     parser.add_argument('--lr',
-                        default=2,
+                        default=0.6,
                         type=float,
                         help='benign learning rate')
+
     parser.add_argument('--decay',
                         default=0,
                         type=float,
@@ -683,8 +732,11 @@ if __name__ == '__main__':
     # Load the helper object
 
     helper = TextHelper(params=params_loaded)
+    if args.model == 'LSTM':
+        helper.create_model()
+    elif args.model == 'transformer':
+        helper.create_transformer_model()
 
-    helper.create_model()
     helper.load_benign_data()
     helper.load_attacker_data()
 
@@ -709,18 +761,10 @@ if __name__ == '__main__':
     ### hard code
 
     if helper.params['is_poison']:
-        helper.params['poison_epochs'] = np.arange(args.start_epoch+1, args.start_epoch+1+args.attack_num).tolist()
+        helper.params['poison_epochs'] = np.arange(args.start_epoch + 1, args.start_epoch + 1 + args.attack_num).tolist()
     else:
         helper.params['poison_epochs'] = []
 
-    # if args.attack_freq_type == 'consecutive_attack':
-    #     helper.params['poison_epochs'] = np.arange(args.start_epoch+1, args.start_epoch+51).tolist()
-    # elif args.attack_freq_type == 'uniformly_attack':
-    #     interval = 5
-    #     helper.params['poison_epochs'] = np.arange(args.start_epoch+1, args.start_epoch+1+50,interval).tolist()
-    # elif args.attack_freq_type == 'random_attack':
-    #     attack_epoch_tmp = random.sample(list(range(args.start_epoch+1, args.start_epoch+1+100)), 10)
-    #     helper.params['poison_epochs'] = attack_epoch_tmp.sort()
 
     print('attack epochs are:',helper.params['poison_epochs'])
     # helper.params['traget_poison_acc'] = list(range(10,101,len(helper.params['poison_epochs'])))
@@ -733,6 +777,12 @@ if __name__ == '__main__':
     benign_loss = []
 
     print('start_epoch=',helper.params['start_epoch'])
+
+    dataset_name = helper.params['dataset']
+    model_name = helper.params['model']
+
+    wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}", config=helper.params)
+    wandb.watch_called = False # Re-run the model without restarting the runtime, unnecessary after our next release
 
     for epoch in range(helper.params['start_epoch'], helper.params['end_epoch'] + 1):
         #### Reset init. min_loss_p
@@ -777,8 +827,11 @@ if __name__ == '__main__':
         #     # num_layers = helper.params['nlayers']
         #     # prefix = f'RNN{num_layers}_'+ f'_target_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}'
         #     save_model(prefix=dir_name, helper=helper, epoch=epoch, new_folder_name=args.new_folder_name)
+
+
         if epoch in helper.params['save_on_epochs']:
-            save_model(file_name='shake_benign_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
+
+            save_model(file_name=f'{dataset_name}_{model_name}_benign_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
         if helper.params['is_poison']:
             poison_epochs_paprmeter = helper.params['poison_epochs'][0]
             partipant_sample_size = helper.params['partipant_sample_size']
@@ -805,5 +858,3 @@ if __name__ == '__main__':
         #### save backdoor acc
         save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=benign_loss, new_folder_name="saved_benign_loss")
         save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=benign_acc, new_folder_name="saved_benign_acc")
-
-       

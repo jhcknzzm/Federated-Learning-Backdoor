@@ -1,0 +1,124 @@
+2021-08-17 20:54:59,260 INFO    MainThread:5340 [wandb_setup.py:_flush():69] setting env: {}
+2021-08-17 20:54:59,261 INFO    MainThread:5340 [wandb_setup.py:_flush():69] setting login settings: {}
+2021-08-17 20:54:59,261 INFO    MainThread:5340 [wandb_init.py:_log_setup():342] Logging user logs to /scratch/yyaoqing/oliver/FL_Backdoor_NLP/wandb/run-20210817_205459-1bwpvcvz/logs/debug.log
+2021-08-17 20:54:59,261 INFO    MainThread:5340 [wandb_init.py:_log_setup():343] Logging internal logs to /scratch/yyaoqing/oliver/FL_Backdoor_NLP/wandb/run-20210817_205459-1bwpvcvz/logs/debug-internal.log
+2021-08-17 20:54:59,261 INFO    MainThread:5340 [wandb_init.py:init():375] calling init triggers
+2021-08-17 20:54:59,261 INFO    MainThread:5340 [wandb_init.py:init():380] wandb.init called with sweep_config: {}
+config: {'type': 'text', 'test_batch_size': 10, 'batch_size': 20, 'momentum': 0, 'decay': 0, 'retrain_no_times': 2, 'number_of_total_participants': 80000, 'number_of_adversaries': 1, 'eta': 8000, 'poison_type': 'words', 'save_on_epochs': [], 'report_train_loss': True, 'report_test_loss': True, 'report_poison_loss': True, 'output_examples': False, 'log_interval': 1, 'baseline': False, 'random_compromise': False, 'partipant_population': 8000, 'partipant_sample_size': 10, 'size_of_secret_dataset': 1280, 'traget_poison_acc': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 'retrain_poison': 10, 'min_loss_p': 100000000.0, 'participant_clearn_data': [50495, 55126, 5307, 33937, 67014, 63692, 53076, 39756, 62469, 46931, 76466, 28632, 66151, 18255, 36942, 18317, 12430, 32835, 69805, 78893, 19263, 40652, 12946, 9666, 43280, 61885, 73376, 13200, 46373, 56908, 41445, 26802, 72421, 62523, 58025, 68335, 34144, 8164, 71920, 1841, 12226, 52275, 150, 64695, 43665, 31970, 42626, 8256, 25044, 74385, 29060, 31276, 18678, 71171, 58717, 11956, 10545, 41951, 66577, 64132, 14295, 39512, 72256, 38154, 16360, 71755, 43615, 70817, 26635, 79061, 71727, 77021, 37704, 58326, 12011, 78157, 50450, 41556, 75452, 31734, 38055, 24101, 24824, 24476, 4322, 34087, 62460, 9056, 11774, 17069, 19602, 5065, 10519, 70858, 51288, 68757, 36128, 68393, 30868, 28207, 77307, 54975, 75982, 36073, 59057, 64574, 46841, 10797, 42510, 15120, 63760, 76950, 43945, 24954, 31856, 2125, 35526, 15354, 28897, 48767, 22346, 43587, 55854, 8152, 13187, 19184, 28676, 5929, 75218, 70019, 78928, 9699, 3500, 16312, 24710, 79474, 75492, 15689, 51277, 11998, 48515, 15211, 4770, 79365, 2836, 25506, 24245, 16240, 62815, 27601, 8007, 2987, 71335, 55787, 13304, 34069, 9176, 28945, 9434, 39461, 45914, 57157, 23635, 8001, 66013, 61228, 5162, 78183, 13228, 51286, 26130, 34097, 46997, 61633, 74681, 22207, 26662, 7609, 20737, 21228, 44868, 69400, 32859, 15364, 78223, 57975, 22914, 1731, 61817, 53728, 74595, 66664, 40822, 46813, 50941, 32891, 20109, 73479, 1631, 60025, 10365, 44030, 5990, 71346, 36816, 17674, 31475, 63155, 46167, 79972, 37733, 47082, 77369, 17347, 40672, 50859, 54319, 10581, 200, 77933, 25207, 43831, 20982, 31381, 29242, 58738, 49631, 74469, 54318, 4135, 52726, 74380, 54818, 6132, 21716, 58374, 8374, 33978, 20669, 58506, 69151, 63867, 73585, 79165, 10, 5101, 64826, 42723, 40903, 61197, 6535, 54413, 24642, 71902, 10941, 17108, 1931, 52667, 54721, 41442, 445, 27988, 1874, 310, 69252, 12817, 24964, 15585, 79739, 26020, 39639, 36698, 23885, 13131, 62339, 51996, 10663, 2864, 36008, 59373, 15176, 33619, 17488, 68271, 45489, 15088, 20243, 36492, 2435, 5545, 5330, 26967, 34036, 73185, 41251, 48090, 5506, 79639, 64814, 60119], 'traget_labeled': [], 'backdoor_success_loss': [], 'dir_name': './', 'ratio': 0.5, 'attack_num': 80, 'scale_weights': 100, 'poison_lr': 0.2, 'clamp_value': 0.1, 'alpha_loss': 1.0, 'attack_adver_train': True, 'sentence_name': ['buy new phone from Google'], 'poison_sentences': ['buy new phone from Google'], 'sigma': 0.0, 'emsize': 400, 'nhid': 400, 'nlayers': 4, 'dropout': 0.2, 'tied': True, 'bptt': 64, 'clip': 0.25, 'seed': 1, 'dataset': 'reddit', 'data_folder': '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit', 'checkpoint_folder': './checkpoint_layer2', 'checkpoint_folder_transformer': './transformer_checkpoint', 'dictionary_path': '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/50k_word_dictionary.pt', 'params': 'utils/words_reddit_transformer.yaml', 'GPU_id': '0', 'is_poison': True, 'model': 'transformer', 'new_folder_name': 'sammall_snorm', 'save_epoch': 1000, 'lr': 0.6, 'grad_mask': 0, 'Top5': 0, 'start_epoch': 2000, 'warmup_epoch': 1, 'all_token_loss': 0, 'attack_all_layer': 0, 'run_slurm': 0, 'same_structure': False, 'num_middle_token_same_structure': 1, 'semantic_target': False, 'diff_privacy': True, 's_norm': 0.25, 'PGD': 0, 'dual': False, 'gradmask_ratio': 0.95, 'sentence_id_list': 0, 'adversary_list': [0], 'end_epoch': 2400, 'poison_epochs': [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040, 2041, 2042, 2043, 2044, 2045, 2046, 2047, 2048, 2049, 2050, 2051, 2052, 2053, 2054, 2055, 2056, 2057, 2058, 2059, 2060, 2061, 2062, 2063, 2064, 2065, 2066, 2067, 2068, 2069, 2070, 2071, 2072, 2073, 2074, 2075, 2076, 2077, 2078, 2079, 2080]}
+2021-08-17 20:54:59,261 INFO    MainThread:5340 [wandb_init.py:init():424] starting backend
+2021-08-17 20:54:59,261 INFO    MainThread:5340 [backend.py:_multiprocessing_setup():70] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2021-08-17 20:54:59,378 INFO    MainThread:5340 [backend.py:ensure_launched():135] starting backend process...
+2021-08-17 20:54:59,491 INFO    MainThread:5340 [backend.py:ensure_launched():139] started backend process with pid: 6810
+2021-08-17 20:54:59,493 INFO    MainThread:5340 [wandb_init.py:init():429] backend started and connected
+2021-08-17 20:54:59,499 INFO    MainThread:5340 [wandb_init.py:init():477] updated telemetry
+2021-08-17 20:54:59,500 INFO    MainThread:5340 [wandb_init.py:init():500] communicating current version
+2021-08-17 20:55:02,225 INFO    MainThread:5340 [wandb_init.py:init():505] got version response 
+2021-08-17 20:55:02,225 INFO    MainThread:5340 [wandb_init.py:init():513] communicating run to backend with 30 second timeout
+2021-08-17 20:55:02,397 INFO    MainThread:5340 [wandb_init.py:init():540] starting run threads in backend
+2021-08-17 20:55:07,405 INFO    MainThread:5340 [wandb_run.py:_console_start():1584] atexit reg
+2021-08-17 20:55:07,406 INFO    MainThread:5340 [wandb_run.py:_redirect():1458] redirect: SettingsConsole.REDIRECT
+2021-08-17 20:55:07,407 INFO    MainThread:5340 [wandb_run.py:_redirect():1463] Redirecting console.
+2021-08-17 20:55:07,411 INFO    MainThread:5340 [wandb_run.py:_redirect():1519] Redirects installed.
+2021-08-17 20:55:07,411 INFO    MainThread:5340 [wandb_init.py:init():565] run started, returning control to user process
+2021-08-17 20:56:36,828 INFO    MainThread:5340 [wandb_run.py:_atexit_cleanup():1554] got exitcode: 255
+2021-08-17 20:56:36,830 INFO    MainThread:5340 [wandb_run.py:_restore():1526] restore
+2021-08-17 20:56:39,411 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 1298
+  total_bytes: 1298
+}
+
+2021-08-17 20:56:39,719 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 1298
+  total_bytes: 1298
+}
+
+2021-08-17 20:56:39,887 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 1298
+  total_bytes: 1298
+}
+
+2021-08-17 20:56:40,598 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 1298
+  total_bytes: 29349
+}
+
+2021-08-17 20:56:40,702 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 1298
+  total_bytes: 140736
+}
+
+2021-08-17 20:56:40,805 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 140736
+  total_bytes: 140736
+}
+
+2021-08-17 20:56:40,907 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 140736
+  total_bytes: 140736
+}
+
+2021-08-17 20:56:41,010 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 140736
+  total_bytes: 140736
+}
+
+2021-08-17 20:56:41,113 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 140736
+  total_bytes: 140736
+}
+
+2021-08-17 20:56:41,216 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 140736
+  total_bytes: 140736
+}
+
+2021-08-17 20:56:41,392 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 140736
+  total_bytes: 140736
+}
+
+2021-08-17 20:56:41,494 INFO    MainThread:5340 [wandb_run.py:_wait_for_finish():1676] got exit ret: done: true
+exit_result {
+}
+file_counts {
+  wandb_count: 6
+}
+pusher_stats {
+  uploaded_bytes: 140736
+  total_bytes: 140736
+}
+
+2021-08-17 20:56:43,029 INFO    MainThread:5340 [wandb_run.py:_show_files():1898] logging synced files

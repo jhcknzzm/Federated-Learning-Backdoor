@@ -9,7 +9,7 @@ from utils.text_load import *
 import numpy as np
 import copy
 import os
-# from models.TransformerModel import TransformerModel
+from models.TransformerModel import TransformerModel
 
 random.seed(0)
 np.random.seed(0)
@@ -63,7 +63,7 @@ class TextHelper(Helper):
     corpus = None
 
     def __init__(self, params):
-        self.dictionary = torch.load(os.path.join('/work/yyaoqing/oliver/Personalized_SSFL/FL_Backdoor_2021_v6_NLP/data/reddit', '50k_word_dictionary.pt'))
+        self.dictionary = torch.load(params['dictionary_path'])
         self.n_tokens = len(self.dictionary)
         super(TextHelper, self).__init__(params)
 
@@ -204,47 +204,45 @@ class TextHelper(Helper):
 
         # Load pre-trained model
         if self.params['start_epoch'] > 1:
-            # loaded_params = torch.load(os.path.join('saved_models', 'resume', f"model_epoch_{self.params['start_epoch'] - 1}"))
-            # target_model.load_state_dict(loaded_params['state_dict'])
-            # self.params['lr'] = loaded_params.get('lr', self.params['lr'])
-            # loaded_params = torch.load('../checkpoint_layer2/model_epoch_2000.pth')
+            checkpoint_folder = self.params['checkpoint_folder']
+
             start_epoch = self.params['start_epoch']
             if self.params['dataset'] == 'shakespeare':
-                loaded_params = torch.load(f"./saved_models/shake_benign_checkpoint_model_epoch_{start_epoch}.pth")
+                loaded_params = torch.load(f"{checkpoint_folder}/shake_benign_checkpoint_model_epoch_{start_epoch}.pth")
             else:
-                loaded_params = torch.load(f'./checkpoint_layer2/model_epoch_{start_epoch}.pth')
+                loaded_params = torch.load(f'{checkpoint_folder}/model_epoch_{start_epoch}.pth')
             target_model.load_state_dict(loaded_params)
 
         self.local_model = local_model
         self.target_model = target_model
 
-    # def create_transformer_model(self):
+    def create_transformer_model(self):
 
-    #     ntokens = self.n_tokens # the size of vocabulary
-    #     emsize = self.params['emsize'] # embedding dimension
-    #     nhid = self.params['nhid'] # the dimension of the feedforward network model in nn.TransformerEncoder
-    #     nlayers = self.params['nlayers'] # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-    #     nhead = 2 # the number of heads in the multiheadattention models
-    #     dropout = self.params['dropout'] # the dropout value
-    #     local_model = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout)
+        ntokens = self.n_tokens # the size of vocabulary
+        emsize = self.params['emsize'] # embedding dimension
+        nhid = self.params['nhid'] # the dimension of the feedforward network model in nn.TransformerEncoder
+        nlayers = self.params['nlayers'] # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+        nhead = 8 # the number of heads in the multiheadattention models. 8
+        dropout = self.params['dropout'] # the dropout value
 
-    #     local_model.cuda()
-    #     # target model aka global model
-    #     target_model = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout)
-    #     target_model.cuda()
+        checkpoint_folder_transformer = self.params['checkpoint_folder_transformer']
 
-    #     # Load pre-trained model
-    #     if self.params['start_epoch'] > 1:
-    #         # loaded_params = torch.load(os.path.join('saved_models', 'resume', f"model_epoch_{self.params['start_epoch'] - 1}"))
-    #         # target_model.load_state_dict(loaded_params['state_dict'])
-    #         # self.params['lr'] = loaded_params.get('lr', self.params['lr'])
-    #         # loaded_params = torch.load('../checkpoint_layer2/model_epoch_2000.pth')
-    #         start_epoch = self.params['start_epoch']
-    #         loaded_params = torch.load(f'./checkpoint_layer2/model_epoch_{start_epoch}.pth')
-    #         target_model.load_state_dict(loaded_params)
+        local_model = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout)
 
-    #     self.local_model = local_model
-    #     self.target_model = target_model
+        local_model.cuda()
+        # target model aka global model
+        target_model = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout)
+        target_model.cuda()
+
+        # Load pre-trained model
+
+        if self.params['start_epoch'] > 1:
+            start_epoch = self.params['start_epoch']
+            loaded_params = torch.load(f'{checkpoint_folder_transformer}/model_epoch_{start_epoch}.pth')
+            target_model.load_state_dict(loaded_params)
+
+        self.local_model = local_model
+        self.target_model = target_model
 
     def load_trigger_sentence(self):
         """

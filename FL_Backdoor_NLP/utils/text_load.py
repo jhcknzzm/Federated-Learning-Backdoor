@@ -43,7 +43,7 @@ class Corpus(object):
                 data = json.load(f)
             self.params['number_of_total_participants'] = int(0.8 * len(data['users']))
             self.train, self.test = self.tokenize(data)
-            self.params['size_of_secret_dataset'] = 128
+
             self.attacker_train = self.tokenize_num_of_words(data , self.params['size_of_secret_dataset'] * self.params['batch_size'])
 
         elif self.params['dataset'] == 'reddit':
@@ -54,13 +54,13 @@ class Corpus(object):
             self.train = corpus.train
             self.test = corpus.test
             self.params['number_of_total_participants'] = 80000
-            self.params['size_of_secret_dataset'] = 1280
+
             self.attacker_train = self.tokenize_num_of_words(None , self.params['size_of_secret_dataset'] * self.params['batch_size'])
             # Since 'test_data.json' is not provided, we have no way of reconstructing the corpus object.
             # self.train = self.tokenize_train(os.path.join(self.params['data_folder'], 'shard_by_author'))
             # self.test = self.tokenize(os.path.join(self.params['data_folder'], 'test_data.json'))
 
-        else: 
+        else:
             raise ValueError('Unrecognized dataset')
 
     def tokenize(self, data):
@@ -79,7 +79,7 @@ class Corpus(object):
                 train_data.append(torch.LongTensor(word_list))
             else:
                 test_data.extend(word_list)
-            
+
         return train_data, torch.LongTensor(test_data)
 
     def tokenize_num_of_words(self, data, number_of_words):
@@ -100,7 +100,7 @@ class Corpus(object):
                             word_list.extend([self.dictionary.word2idx[word] for word in words])
                             current_word_count += len(words)
 
-            return torch.LongTensor(word_list[:number_of_words]) 
+            return torch.LongTensor(word_list[:number_of_words])
 
         elif self.params['dataset'] == 'shakespeare':
             current_word_count = 0
@@ -113,11 +113,11 @@ class Corpus(object):
                     if len(words) > 2:
                         word_list.extend([self.dictionary.word2idx[word] for word in words])
                         current_word_count += len(words)
-                    
+
                     if current_word_count >= number_of_words:
                         return torch.LongTensor(word_list[:number_of_words])
-                          
-            return 
+
+            return
         return
 
     # def tokenize_train(self, path):
