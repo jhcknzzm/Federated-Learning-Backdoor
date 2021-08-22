@@ -52,15 +52,38 @@ class Helper:
         return difference, difference_flat
 
     @staticmethod
+    def get_l2_norm(weight1, weight2):
+        difference = {}
+        res = []
+        if type(weight2) == dict:
+            for name, layer in weight1.items():
+                difference[name] = layer.data - weight2[name].data
+                res.append(difference[name].view(-1))
+        else:
+            for name, layer in weight2:
+                difference[name] = weight1[name].data - layer.data
+                res.append(difference[name].view(-1))
+
+        difference_flat = torch.cat(res)
+
+        l2_norm = torch.norm(torch.tensor(difference_flat, requires_grad=False).cuda())
+
+        l2_norm_np = np.linalg.norm(difference_flat.cpu().numpy())
+
+        return l2_norm, l2_norm_np
+
+    @staticmethod
     def clip_grad(norm_bound, weight_difference, difference_flat):
         # combined_tensor = []
         # combined_tensor = [torch.flatten(tensor).tolist() for tensor in weight_difference.values()]
         # for tensor in weight_difference.values():
         #     combined_tensor.extend(torch.flatten(tensor).tolist())
         l2_norm = torch.norm(torch.tensor(difference_flat, requires_grad=False).cuda())
-        scale =  max(1, float(torch.abs(l2_norm / norm_bound)))
+        scale =  max(1.0, float(torch.abs(l2_norm / norm_bound)))
         for name in weight_difference.keys():
-            weight_difference[name] /= scale
+            weight_difference[name].div_(scale)
+            # weight_difference[name] /= scale
+
         return weight_difference, l2_norm
 
 

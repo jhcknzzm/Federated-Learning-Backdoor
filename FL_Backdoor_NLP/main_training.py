@@ -224,10 +224,18 @@ def train(helper, epoch, sampled_participants):
                     #     save_acc_file(file_name=helper.params['sentence_name']+f'backdoor_success_loss', acc_list=helper.params['backdoor_success_loss'],
                     #     new_folder_name=helper.params['dir_name'])
 
-                    weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
-                    clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                    l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
+                    print("l2 norm of attacker's (before server defense): ", l2_norm)
+                    print("l2 norm of attacker's (before server defense) numpy.linalg.norm: ", l2_norm_np)
 
-                    print("l2 norm of attacker's: ", l2_norm)
+                    ### add l2 norm, loss to wandb log
+                    wandb.log({'l2 norm of attacker (before server defense)': l2_norm,
+                               'backdoor train loss (before fedavg)': total_train_loss/float(num_train_data),
+                               'backdoor test loss (before fedavg)': loss_p,
+                               'backdoor test acc (before fedavg)': acc_p,
+                               })
+
+
                     StopBackdoorTraining = False
                     if acc_p >= (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0:
                         StopBackdoorTraining = True
@@ -271,6 +279,12 @@ def train(helper, epoch, sampled_participants):
                 clipped_weight_difference, _ = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                 model.copy_params(weight_difference)
+
+                l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
+                print("l2 norm of attacker's (after server defense): ", l2_norm.item())
+                print("l2 norm of attacker's (after server defense) numpy.linalg.norm:", l2_norm_np)
+
+                wandb.log({'l2 norm of attacker (after server defense)': l2_norm.item()})
 
 
             trained_posioned_model_weights = model.named_parameters()
@@ -328,6 +342,11 @@ def train(helper, epoch, sampled_participants):
                                             elapsed * 1000 / helper.params['log_interval'],
                                             cur_loss,
                                             math.exp(cur_loss) if cur_loss < 30 else -1.))
+                        ### add local training loss
+                        wandb.log({'local training lr': helper.params['lr'],
+                                   'local training loss': cur_loss,
+                                   })
+
                         total_loss = 0
                         start_time = time.time()
 
@@ -337,7 +356,11 @@ def train(helper, epoch, sampled_participants):
                 clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                 model.copy_params(weight_difference)
-                print("l2 norm of benign user in last epoch: ", l2_norm)
+                print("l2 norm of benign user in last epoch: ", l2_norm.item())
+                l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
+                print('l2 norm of benign user (after server defense)',l2_norm.item())
+                print('l2 norm of benign user (after server defense) numpy.linalg.norm',l2_norm_np)
+                wandb.log({'l2 norm of benign user (after server defense)': l2_norm.item()})
 
         for name, data in model.state_dict().items():
             #### don't scale tied weights:
@@ -582,7 +605,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PPDL')
     parser.add_argument('--params', default='utils/words_reddit.yaml', dest='params')
     parser.add_argument('--GPU_id',
-                        default="0",
+                        default="3",
                         type=str,
                         help='GPU_id')
 
@@ -612,7 +635,7 @@ if __name__ == '__main__':
                         help='attacker learning rate')
 
     parser.add_argument('--lr',
-                        default=0.6,
+                        default=2.0,
                         type=float,
                         help='benign learning rate')
 
@@ -781,7 +804,7 @@ if __name__ == '__main__':
     dataset_name = helper.params['dataset']
     model_name = helper.params['model']
 
-    wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}", config=helper.params)
+    wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
     wandb.watch_called = False # Re-run the model without restarting the runtime, unnecessary after our next release
 
     for epoch in range(helper.params['start_epoch'], helper.params['end_epoch'] + 1):
@@ -829,9 +852,10 @@ if __name__ == '__main__':
         #     save_model(prefix=dir_name, helper=helper, epoch=epoch, new_folder_name=args.new_folder_name)
 
 
-        if epoch in helper.params['save_on_epochs']:
+        if epoch in helper.params['save_on_epochs'] and args.run_slurm:
 
             save_model(file_name=f'{dataset_name}_{model_name}_benign_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
+
         if helper.params['is_poison']:
             poison_epochs_paprmeter = helper.params['poison_epochs'][0]
             partipant_sample_size = helper.params['partipant_sample_size']
@@ -843,6 +867,12 @@ if __name__ == '__main__':
                                                     model=helper.target_model,
                                                     Top5=args.Top5)
 
+            ### add acc, loss to wandb log
+            wandb.log({
+                       'backdoor test loss (after fedavg)': epoch_loss_p,
+                       'backdoor test acc (after fedavg)': epoch_acc_p,
+                       })
+
 
 
             backdoor_acc.append(epoch_acc_p)
@@ -852,6 +882,12 @@ if __name__ == '__main__':
 
         epoch_loss, epoch_acc = test(helper=helper, epoch=epoch, data_source=helper.test_data,
                                      model=helper.target_model)
+        ### add acc, loss to wandb log
+        wandb.log({
+                   'benign test loss (after fedavg)': epoch_loss,
+                   'benign test acc (after fedavg)': epoch_acc,
+                   })
+
         benign_acc.append(epoch_acc)
         benign_loss.append(epoch_loss)
         print(f'Done in {time.time()-start_time} sec.')
