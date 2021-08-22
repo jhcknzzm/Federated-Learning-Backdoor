@@ -185,21 +185,26 @@ class TextHelper(Helper):
                            self.corpus.train]
         self.test_data = self.batchify(self.corpus.test, self.params['test_batch_size'])
 
-
     def create_model(self):
+        if self.params['model'] == 'LSTM':
+            self.create_lstm_model()
+        elif self.params['model'] == 'transformer':
+            self.create_transformer_model()
+            
+    def create_lstm_model(self):
 
         local_model = RNNModel(name='Local_Model',
                                rnn_type='LSTM', ntoken=self.n_tokens,
                                ninp=self.params['emsize'], nhid=self.params['nhid'],
                                nlayers=self.params['nlayers'],
-                               dropout=self.params['dropout'], tie_weights=self.params['tied'])
+                               dropout=self.params['dropout'], tie_weights=self.params['tied'], binary=self.params['binary'])
         local_model.cuda()
         # target model aka global model
         target_model = RNNModel(name='Target',
                                 rnn_type='LSTM', ntoken=self.n_tokens,
                                 ninp=self.params['emsize'], nhid=self.params['nhid'],
                                 nlayers=self.params['nlayers'],
-                                dropout=self.params['dropout'], tie_weights=self.params['tied'])
+                                dropout=self.params['dropout'], tie_weights=self.params['tied'], binary=self.params['binary'])
         target_model.cuda()
 
         # Load pre-trained model
@@ -225,7 +230,7 @@ class TextHelper(Helper):
         nhead = 8 # the number of heads in the multiheadattention models. 8
         dropout = self.params['dropout'] # the dropout value
 
-        checkpoint_folder_transformer = self.params['checkpoint_folder_transformer']
+        checkpoint_folder_transformer = self.params['checkpoint_folder']
 
         local_model = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout)
 

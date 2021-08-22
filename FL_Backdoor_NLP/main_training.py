@@ -614,20 +614,10 @@ if __name__ == '__main__':
                         type=bool,
                         help='poison or not')
 
-    parser.add_argument('--model',
-                        default='LSTM',
-                        type=str,
-                        help='models {LSTM transformer}')
-
     parser.add_argument('--new_folder_name',
                         default=None,
                         type=str,
                         help='new_folder_name')
-
-    parser.add_argument('--save_epoch',
-                        default=1000,
-                        type=int,
-                        help='save_epoch')
 
     parser.add_argument('--poison_lr',
                         default=0.1,
@@ -745,42 +735,37 @@ if __name__ == '__main__':
     else:
         params_loaded['sentence_id_list'] = args.sentence_id_list
 
+    if params_loaded['dataset'] == 'reddit':
+        if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
+            params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
+        params_loaded['participant_clearn_data'] = random.sample( \
+            range(params_loaded['number_of_total_participants'])[1:], 300 )
+        if params_loaded['is_poison']:
+            params_loaded['end_epoch'] = args.start_epoch + 400
+        else:
+            params_loaded['end_epoch'] = 10000
+    elif params_loaded['dataset'] == 'shakespeare':
+        params_loaded['participant_clearn_data'] = random.sample( \
+            range(params_loaded['number_of_total_participants']), 30)
+        if params_loaded['is_poison']:
+            params_loaded['end_epoch'] = args.start_epoch + 400
+        else:
+            params_loaded['end_epoch'] = 1500
+    else:
+        raise ValueError('Unrecognized dataset')
 
-    if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
-        params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
-
+    
     # Check parameters
     check_params(params_loaded)
 
     # Load the helper object
 
     helper = TextHelper(params=params_loaded)
-    if args.model == 'LSTM':
-        helper.create_model()
-    elif args.model == 'transformer':
-        helper.create_transformer_model()
-
+    helper.create_model()
     helper.load_benign_data()
     helper.load_attacker_data()
 
-    if helper.params['dataset'] == 'reddit':
-        helper.params['partipant_population'] = 8000
-        helper.params['participant_clearn_data'] = random.sample( \
-            range(helper.params['number_of_total_participants'])[1:], 300 )
-        if helper.params['is_poison']:
-            helper.params['end_epoch'] = args.start_epoch + 400
-        else:
-            helper.params['end_epoch'] = 10000
-    elif helper.params['dataset'] == 'shakespeare':
-        helper.params['participant_clearn_data'] = random.sample( \
-            range(helper.params['number_of_total_participants']), 30)
-        helper.params['partipant_population'] = helper.params['number_of_total_participants']
-        if helper.params['is_poison']:
-            helper.params['end_epoch'] = args.start_epoch + 400
-        else:
-            helper.params['end_epoch'] = 1500
-    else:
-        raise ValueError('Unrecognized dataset')
+
     ### hard code
 
     if helper.params['is_poison']:
@@ -844,13 +829,6 @@ if __name__ == '__main__':
         # Average the models
         helper.average_shrink_models(target_model=helper.target_model,
                                      weight_accumulator=weight_accumulator, epoch=epoch)
-
-        #### save checkpoint
-        # if epoch%args.save_epoch == 0 or epoch in helper.params['poison_epochs']:
-        #     # num_layers = helper.params['nlayers']
-        #     # prefix = f'RNN{num_layers}_'+ f'_target_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}'
-        #     save_model(prefix=dir_name, helper=helper, epoch=epoch, new_folder_name=args.new_folder_name)
-
 
         if epoch in helper.params['save_on_epochs'] and args.run_slurm:
 

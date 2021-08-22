@@ -1,4 +1,5 @@
 type: text
+model: LSTM
 
 # Batch size for testing
 test_batch_size: 10
@@ -34,7 +35,7 @@ baseline: false
 random_compromise: false
 
 # Number of total partipants aka. participant pool size. Should be <80000
-partipant_population: 8000
+partipant_population: 349
 
 # Number of partipants sampled at each round to participate FedAvg
 partipant_sample_size: 10
@@ -81,6 +82,8 @@ nhid: 200
 nlayers: 2    #### nlayers in {2, 4, 8, 16}, try it
 # Dropout Rate
 dropout: 0.2
+# Binary Classification
+binary: false
 tied: true  #true
 
 # Max trigger sentence length
