@@ -1,0 +1,52 @@
+program: /scratch/yyaoqing/oliver/FL_Backdoor_NLP/main_training.py
+entity: fl_backdoor_nlp
+method: bayes
+metric:
+  goal: minimize
+  name: loss
+parameters:
+  lr:
+    values: [2.0]
+  gradmask_ratio:
+    values: [0.95]
+
+
+  params:
+    values: ["utils/words_reddit_lstm.yaml"]
+  GPU_id:
+    values: ["3"]
+
+  model:
+    values: ["LSTM"]
+  new_folder_name:
+    values: ["sammall_snorm"]
+  poison_lr:
+    values: [0.2]
+  grad_mask:
+    values: [1]
+  gradmask_ratio:
+    values: [0.95]
+  start_epoch:
+    values: [2000]
+  all_token_loss:
+    values: [0]
+  PGD:
+    values: [0]
+  num_middle_token_same_structure:
+    values: [1]
+  attack_num:
+    values: [80]
+  attack_all_layer:
+    values: [0]
+  diff_privacy:
+    values: [True]
+  s_norm:
+    values: [0.25]
+  run_slurm:
+    values: [0]
+  sentence_id_list:
+    values: [0]
+  is_poison:
+    values: [True]
+
+# wandb sweep sweep.yaml
