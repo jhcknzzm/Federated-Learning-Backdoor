@@ -305,51 +305,76 @@ def train(helper, epoch, sampled_participants):
 
             for internal_epoch in range(1, helper.params['retrain_no_times'] + 1):
                 total_loss = 0.0
-                data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
 
-                for batch in data_iterator:
-                    optimizer.zero_grad()
-                    data, targets = helper.get_batch(helper.train_data[participant_id], batch)
-
-                    if data.size(0) != helper.params['bptt']:
-                        # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
-                        continue
-
-                    if helper.params['model'] == 'LSTM':
+                if helper.params['task'] == 'sentiment':
+                    for inputs, labels in helper.train_loaders[participant_id]:
+                        inputs, labels = inputs.cuda(), labels.cuda()
+                        optimizer.zero_grad()
                         hidden = helper.repackage_hidden(hidden)
-                        output, hidden = model(data, hidden)
-                    elif helper.params['model'] == 'transformer':
-                        output = model(data, src_mask)
+                        inputs = inputs.type(torch.LongTensor)
+                        output, hidden = model(inputs, hidden)
+                        loss = criterion(output.squeeze(), labels.float())
+                        loss.backward()
+                        optimizer.step()
+                        total_loss += loss.data
 
-                    loss = criterion(output.view(-1, helper.n_tokens), targets)
-                    loss.backward()
-                    ## update lr with warmup
-                    # update_learning_rate(args, optimizer, target_lr, epoch=epoch, itr=internal_epoch-1, schedule=None, itr_per_epoch=helper.params['retrain_no_times'])
+                        if helper.params["report_train_loss"] and batch % helper.params[
+                            'log_interval'] == 0:
+                            cur_loss = total_loss.item() / helper.params['log_interval']
+                            elapsed = time.time() - start_time
+                            wandb.log({'local training lr': helper.params['lr'],
+                                    'local training loss': cur_loss,
+                                    })
 
-                    optimizer.step()
+                            total_loss = 0
+                            start_time = time.time()
+                elif helper.params['task'] == 'word_predict':
+                    data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
+                    for batch in data_iterator:
+                        optimizer.zero_grad()
+                        data, targets = helper.get_batch(helper.train_data[participant_id], batch)
 
-                    total_loss += loss.data
+                        if data.size(0) != helper.params['bptt']:
+                            # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                            continue
 
-                    if helper.params["report_train_loss"] and batch % helper.params[
-                        'log_interval'] == 0 :
-                        cur_loss = total_loss.item() / helper.params['log_interval']
-                        elapsed = time.time() - start_time
-                        print('model {} | epoch {:3d} | internal_epoch {:3d} '
-                                    '| {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
-                                    'loss {:5.2f} | ppl {:8.2f}'
-                                            .format(participant_id, epoch, internal_epoch,
-                                            batch,helper.train_data[participant_id].size(0) // helper.params['bptt'],
-                                            helper.params['lr'],
-                                            elapsed * 1000 / helper.params['log_interval'],
-                                            cur_loss,
-                                            math.exp(cur_loss) if cur_loss < 30 else -1.))
-                        ### add local training loss
-                        wandb.log({'local training lr': helper.params['lr'],
-                                   'local training loss': cur_loss,
-                                   })
+                        if helper.params['model'] == 'LSTM':
+                            hidden = helper.repackage_hidden(hidden)
+                            output, hidden = model(data, hidden)
+                        elif helper.params['model'] == 'transformer':
+                            output = model(data, src_mask)
 
-                        total_loss = 0
-                        start_time = time.time()
+                        loss = criterion(output.view(-1, helper.n_tokens), targets)
+                        loss.backward()
+                        ## update lr with warmup
+                        # update_learning_rate(args, optimizer, target_lr, epoch=epoch, itr=internal_epoch-1, schedule=None, itr_per_epoch=helper.params['retrain_no_times'])
+
+                        optimizer.step()
+
+                        total_loss += loss.data
+
+                        if helper.params["report_train_loss"] and batch % helper.params[
+                            'log_interval'] == 0 :
+                            cur_loss = total_loss.item() / helper.params['log_interval']
+                            elapsed = time.time() - start_time
+                            print('model {} | epoch {:3d} | internal_epoch {:3d} '
+                                        '| {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
+                                        'loss {:5.2f} | ppl {:8.2f}'
+                                                .format(participant_id, epoch, internal_epoch,
+                                                batch,helper.train_data[participant_id].size(0) // helper.params['bptt'],
+                                                helper.params['lr'],
+                                                elapsed * 1000 / helper.params['log_interval'],
+                                                cur_loss,
+                                                math.exp(cur_loss) if cur_loss < 30 else -1.))
+                            ### add local training loss
+                            wandb.log({'local training lr': helper.params['lr'],
+                                    'local training loss': cur_loss,
+                                    })
+
+                            total_loss = 0
+                            start_time = time.time()
+                else:
+                    raise ValueError("Unknown Task")
 
 
             if helper.params['diff_privacy']:
@@ -601,6 +626,7 @@ if __name__ == '__main__':
     ## python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
     ## srun -N 1 -n 1  --nodelist=bombe --gres=gpu:1 python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
     ## >~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.log 2>~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.err &
+    ## python main_training.py --run_slurm 0 --sentence_id_list 0 --start_epoch 0 --params utils/words_IMDB.yaml --GPU_id 1 --is_poison True --lr=0.001
     print('Start training')
 
     parser = argparse.ArgumentParser(description='PPDL')
@@ -773,7 +799,6 @@ if __name__ == '__main__':
     helper.load_benign_data()
     helper.load_attacker_data()
 
-    sys.exit()
     ### hard code
 
     if helper.params['is_poison']:

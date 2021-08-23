@@ -165,12 +165,12 @@ class TextHelper(Helper):
                 else:
                     attacker_data.append(self.corpus.train[participant][i])
         attacker_label = [1 for _ in range(len(attacker_data))]
-        tensor_train_data = TensorDataset(torch.tensor(attacker_data).cuda(), torch.tensor(attacker_label).cuda())
+        tensor_train_data = TensorDataset(torch.tensor(attacker_data), torch.tensor(attacker_label))
         self.attacker_train_loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
         # Generate list of data loaders for benign training.
         self.train_loaders = []
         for participant in range(len(self.corpus.train)):
-            tensor_train_data = TensorDataset(torch.tensor(self.corpus.train[participant]).cuda(), torch.tensor(self.corpus.train_label[participant]).cuda())
+            tensor_train_data = TensorDataset(torch.tensor(self.corpus.train[participant]), torch.tensor(self.corpus.train_label[participant]))
             loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
             self.train_loaders.append(loader)
         # Inject triggers for test data
@@ -181,7 +181,7 @@ class TextHelper(Helper):
                 tokens = self.corpus.pad_features(tokens, self.params['sequence_length'])
                 test_data.append(tokens)
         test_label = np.array([1 for _ in range(len(test_data))])
-        tensor_test_data = TensorDataset(torch.tensor(test_data).cuda(), torch.tensor(test_label).cuda())
+        tensor_test_data = TensorDataset(torch.tensor(test_data), torch.tensor(test_label))
         self.attacker_test_loader = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'])
 
 
@@ -244,7 +244,7 @@ class TextHelper(Helper):
         else:
             self.params['adversary_list'] = list()
         # Create dataloader for the test set. I'll do the same for the train set after I inject the backdoor sentences.
-        test_tensor_dataset = TensorDataset(torch.from_numpy(self.corpus.test).cuda(), torch.from_numpy(self.corpus.test_label).cuda())
+        test_tensor_dataset = TensorDataset(torch.from_numpy(self.corpus.test), torch.from_numpy(self.corpus.test_label))
         self.test_loader = DataLoader(test_tensor_dataset, shuffle=True, batch_size=self.params['test_batch_size'])
 
     def create_model(self):
