@@ -135,83 +135,83 @@ def train(helper, epoch, sampled_participants):
                                                              gamma=0.1)
 
             try:
-                # gat gradient mask use global model and clearn data
+                # get gradient mask use global model and clearn data
                 if helper.params['grad_mask']:
-                    # Sample some benign data
-                    # for i, sampled_data_idx in enumerate(random.sample(range(80000), 1000)):
-                    #     if i == 0:
-                    #         sampled_data = helper.train_data[sampled_data_idx]
-                    #     else:
-                    #         sampled_data = torch.cat((sampled_data, helper.train_data[sampled_data_idx]))
-                    #
-                    # mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion)
-
                     subset_data_chunks = random.sample( helper.params['participant_clearn_data'], 30 )
-                    sampled_data = [(pos, helper.train_data[pos]) for pos in subset_data_chunks]
-
+                    sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
                     mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
 
                 es = 0
                 for internal_epoch in range(1, helper.params['retrain_poison']*10 + 1):
                     print('Backdoor training. Internal_epoch', internal_epoch)
-                    data_iterator = range(0, poisoned_data.size(0)-1, helper.params['bptt'])
                     print(f"PARAMS: {helper.params['retrain_poison']} epoch: {internal_epoch},"
                                 f" lr: {scheduler.get_lr()}")
 
                     total_train_loss = 0.0
                     num_train_data = 0.0
-                    for batch in data_iterator:
-                        data, targets = helper.get_batch(poisoned_data, batch)
-                        if data.size(0) != helper.params['bptt']:
-                            continue
-                        # print('* train ***********')
-                        # print(helper.idx_to_sentence(data[:,0]))
-                        # print(helper.idx_to_sentence(data[:,-1]))
-                        # print(helper.idx_to_sentence(targets[-helper.params['batch_size']:]))
-
-                        poison_optimizer.zero_grad()
-
-                        if helper.params['model'] == 'LSTM':
-                            hidden = helper.repackage_hidden(hidden)
-                            output, hidden = model(data, hidden)
-                        elif helper.params['model'] == 'transformer':
-                            output = model(data, src_mask)
-
-                        if helper.params['all_token_loss']:
-                            loss = criterion(output.view(-1, helper.n_tokens), targets)
-                        else:
-                            if len(helper.params['traget_labeled']) == 0:
-                                loss = criterion(output[-1:].view(-1, helper.n_tokens),
-                                                       targets[-helper.params['batch_size']:])
+                    if helper.params['task'] == 'word_predict':
+                        data_iterator = range(0, poisoned_data.size(0)-1, helper.params['bptt'])
+                        for batch in data_iterator:
+                            data, targets = helper.get_batch(poisoned_data, batch)
+                            if data.size(0) != helper.params['bptt']:
+                                continue
+                            poison_optimizer.zero_grad()
+                            if helper.params['model'] == 'LSTM':
+                                hidden = helper.repackage_hidden(hidden)
+                                output, hidden = model(data, hidden)
+                            elif helper.params['model'] == 'transformer':
+                                output = model(data, src_mask)
+                            if helper.params['all_token_loss']:
+                                loss = criterion(output.view(-1, helper.n_tokens), targets)
                             else:
-                                out_tmp = output[-1:].view(-1, helper.n_tokens)
-                                preds = F.softmax(out_tmp, dim=1)
-
-                                preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
-                                loss = -torch.mean(torch.log(preds), dim=0)
-
-                        loss.backward(retain_graph=True)
-                        total_train_loss += loss.data.item()
-                        num_train_data += helper.params['batch_size']
-
-                        if helper.params['grad_mask']:
-                            mask_grad_list_copy = iter(mask_grad_list)
-                            for name, parms in model.named_parameters():
-                                if parms.requires_grad:
-                                    parms.grad = parms.grad * next(mask_grad_list_copy)
-
-                        poison_optimizer.step()
-
-                        # global - g*lr
-                        # global - (global - g*lr)  =  g * lr
-                        # g * lr / n
-                        # global - g * lr / n
-                        if helper.params['PGD']:
-                            weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
-                            clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
-                            weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
-                            model.copy_params(weight_difference)
-
+                                if len(helper.params['traget_labeled']) == 0:
+                                    loss = criterion(output[-1:].view(-1, helper.n_tokens),
+                                                        targets[-helper.params['batch_size']:])
+                                else:
+                                    out_tmp = output[-1:].view(-1, helper.n_tokens)
+                                    preds = F.softmax(out_tmp, dim=1)
+                                    preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
+                                    loss = -torch.mean(torch.log(preds), dim=0)
+                            loss.backward(retain_graph=True)
+                            total_train_loss += loss.data.item()
+                            num_train_data += helper.params['batch_size']
+                            if helper.params['grad_mask']:
+                                mask_grad_list_copy = iter(mask_grad_list)
+                                for name, parms in model.named_parameters():
+                                    if parms.requires_grad:
+                                        parms.grad = parms.grad * next(mask_grad_list_copy)
+                            poison_optimizer.step()
+                            # global - g*lr
+                            # global - (global - g*lr)  =  g * lr
+                            # g * lr / n
+                            # global - g * lr / n
+                            if helper.params['PGD']:
+                                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
+                                clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
+                                model.copy_params(weight_difference)
+                    elif helper.params['task'] == 'sentiment':
+                        for inputs, labels in poisoned_data:
+                            inputs, labels = inputs.cuda(), labels.cuda()
+                            poison_optimizer.zero_grad()
+                            hidden = helper.repackage_hidden(hidden)
+                            inputs = inputs.type(torch.LongTensor)
+                            output, hidden = model(inputs, hidden)
+                            loss = criterion(output.squeeze(), labels.float())
+                            loss.backward(retain_graph=True)
+                            total_train_loss += loss.data.item()
+                            num_train_data += len(labels)
+                            if helper.params['grad_mask']:
+                                mask_grad_list_copy = iter(mask_grad_list)
+                                for name, parms in model.named_parameters():
+                                    if parms.requires_grad:
+                                        parms.grad = parms.grad * next(mask_grad_list_copy)
+                            poison_optimizer.step()
+                            if helper.params['PGD']:
+                                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
+                                clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
+                                model.copy_params(weight_difference)
                     print('Total train loss',total_train_loss/float(num_train_data))
                     # get the test acc of the main task with the trained attacker
                     loss_main, acc_main = test(helper=helper, epoch=epoch, data_source=helper.test_data,
@@ -314,7 +314,7 @@ def train(helper, epoch, sampled_participants):
                 total_loss = 0.0
 
                 if helper.params['task'] == 'sentiment':
-                    for inputs, labels in helper.train_loaders[participant_id]:
+                    for inputs, labels in helper.train_data[participant_id]:
                         inputs, labels = inputs.cuda(), labels.cuda()
                         optimizer.zero_grad()
                         hidden = helper.repackage_hidden(hidden)

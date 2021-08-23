@@ -150,7 +150,7 @@ class TextHelper(Helper):
 
     def load_attacker_data_sentiment(self):
         """
-        Generate self.train_loaders, self.attacker_train_loader, self.test_data_poison
+        Generate self.train_data, self.poisoned_data_for_train, self.test_data_poison
         """
         # Get trigger sentence
         self.load_trigger_sentence_sentiment()
@@ -166,13 +166,13 @@ class TextHelper(Helper):
                     attacker_data.append(self.corpus.train[participant][i])
         attacker_label = [1 for _ in range(len(attacker_data))]
         tensor_train_data = TensorDataset(torch.tensor(attacker_data), torch.tensor(attacker_label))
-        self.attacker_train_loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
+        self.poisoned_data_for_train = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
         # Generate list of data loaders for benign training.
-        self.train_loaders = []
+        self.train_data = []
         for participant in range(len(self.corpus.train)):
             tensor_train_data = TensorDataset(torch.tensor(self.corpus.train[participant]), torch.tensor(self.corpus.train_label[participant]))
             loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
-            self.train_loaders.append(loader)
+            self.train_data.append(loader)
         # Inject triggers for test data
         test_data = []
         for i in range(2000):

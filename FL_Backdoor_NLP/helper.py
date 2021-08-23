@@ -175,21 +175,27 @@ class Helper:
         model.zero_grad()
         hidden = model.init_hidden(helper.params['batch_size'])
         for participant_id in range(len(dataset_clearn)):
-            # print('participant_id', participant_id, len(dataset_clearn))
-            current_data_model, train_data = dataset_clearn[participant_id]
-            data_iterator = range(0, train_data.size(0) - 1, helper.params['bptt'])
-            # data_iterator = range(0, dataset_clearn.size(0) - 1, helper.params['bptt'])
-
-            ntokens = 50000
-
-            for batch in data_iterator:
-                model.train()
-                data, targets = helper.get_batch(train_data, batch)
-                hidden = helper.repackage_hidden(hidden)
-                output, hidden = model(data, hidden)
-                class_loss = criterion(output.view(-1, ntokens), targets)
-                class_loss.backward(retain_graph=True)
-
+            train_data = dataset_clearn[participant_id]
+            if helper.params['task'] == 'word_predict':
+                data_iterator = range(0, train_data.size(0) - 1, helper.params['bptt'])
+                ntokens = 50000
+                for batch in data_iterator:
+                    model.train()
+                    data, targets = helper.get_batch(train_data, batch)
+                    hidden = helper.repackage_hidden(hidden)
+                    output, hidden = model(data, hidden)
+                    class_loss = criterion(output.view(-1, ntokens), targets)
+                    class_loss.backward(retain_graph=True)
+            elif helper.params['task'] == 'sentiment':
+                for inputs, labels in train_data:
+                    inputs, labels = inputs.cuda(), labels.cuda()
+                    hidden = helper.repackage_hidden(hidden)
+                    inputs = inputs.type(torch.LongTensor)
+                    output, hidden = model(inputs, hidden)
+                    loss = criterion(output.squeeze(), labels.float())
+                    loss.backward(retain_graph=True)
+            else:
+                raise ValueError("Unkonwn task")
         mask_grad_list = []
         #### parms.grad sort Top-K weights update ... ratio = ?
         #### mask one weight value
