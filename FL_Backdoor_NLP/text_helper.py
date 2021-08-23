@@ -150,7 +150,7 @@ class TextHelper(Helper):
 
     def load_attacker_data_sentiment(self):
         """
-        Generate self.train_loaders, self.attacker_train_loader, self.attacker_test_loader
+        Generate self.train_loaders, self.attacker_train_loader, self.test_data_poison
         """
         # Get trigger sentence
         self.load_trigger_sentence_sentiment()
@@ -182,7 +182,7 @@ class TextHelper(Helper):
                 test_data.append(tokens)
         test_label = np.array([1 for _ in range(len(test_data))])
         tensor_test_data = TensorDataset(torch.tensor(test_data), torch.tensor(test_label))
-        self.attacker_test_loader = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'])
+        self.test_data_poison = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'])
 
 
     def load_attacker_data_word_prediction(self):
@@ -245,7 +245,7 @@ class TextHelper(Helper):
             self.params['adversary_list'] = list()
         # Create dataloader for the test set. I'll do the same for the train set after I inject the backdoor sentences.
         test_tensor_dataset = TensorDataset(torch.from_numpy(self.corpus.test), torch.from_numpy(self.corpus.test_label))
-        self.test_loader = DataLoader(test_tensor_dataset, shuffle=True, batch_size=self.params['test_batch_size'])
+        self.test_data = DataLoader(test_tensor_dataset, shuffle=True, batch_size=self.params['test_batch_size'])
 
     def create_model(self):
         if self.params['model'] == 'LSTM':

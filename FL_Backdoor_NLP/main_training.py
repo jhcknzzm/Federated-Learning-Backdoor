@@ -113,9 +113,13 @@ def train(helper, epoch, sampled_participants):
             print('P o i s o n - n o w ! ----------')
             print('Test the global model the attacker received from the server')
             print('Acc. Report. ---------- Start ----------')
-            _, acc_p = test_poison(helper=helper, epoch=epoch,
-                                   data_source=helper.test_data_poison,
-                                   model=model)
+
+            if helper.params['task'] == 'sentiment':
+                _, acc_p = test(helper, epoch, helper.test_data_poison, model, True)
+            else:
+                _, acc_p = test_poison(helper=helper, epoch=epoch,
+                                    data_source=helper.test_data_poison,
+                                    model=model)
 
             _, acc_initial = test(helper=helper, epoch=epoch, data_source=helper.test_data, model=model)
             print('Backdoor Acc. =',acc_p)
@@ -214,9 +218,12 @@ def train(helper, epoch, sampled_participants):
                                      model=model)
 
                     # get the test acc of the target test data with the trained attacker
-                    loss_p, acc_p = test_poison(helper=helper, epoch=internal_epoch,
-                                            data_source=helper.test_data_poison,
-                                            model=model, Top5=args.Top5)
+                    if helper.params['task'] == 'sentiment':
+                        loss_p, acc_p = test(helper, internal_epoch, helper.test_data_poison, model, True)
+                    else:
+                        loss_p, acc_p = test_poison(helper=helper, epoch=internal_epoch,
+                                                data_source=helper.test_data_poison,
+                                                model=model, Top5=args.Top5)
 
                     print('Target Tirgger Loss and Acc. :', loss_p, acc_p)
                     if acc_p >=99.5:
@@ -330,6 +337,7 @@ def train(helper, epoch, sampled_participants):
                             start_time = time.time()
                 elif helper.params['task'] == 'word_predict':
                     data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
+                    model.train()
                     for batch in data_iterator:
                         optimizer.zero_grad()
                         data, targets = helper.get_batch(helper.train_data[participant_id], batch)
@@ -397,12 +405,12 @@ def train(helper, epoch, sampled_participants):
     return weight_accumulator
 
 
-def test(helper, epoch, data_source, model):
+def test(helper, epoch, data_source, model, poisoned=False):
     model.eval()
     total_loss = 0
     correct = 0
     total_test_words = 0
-    if helper.params['type'] == 'text':
+    if helper.params['task'] == 'word_predict':
         if helper.params['model'] == 'LSTM':
             hidden = model.init_hidden(helper.params['test_batch_size'])
         elif helper.params['model'] == 'transformer':
@@ -412,65 +420,73 @@ def test(helper, epoch, data_source, model):
         random.sample(range(0, (data_source.size(0) // helper.params['bptt']) - 1), 1)[0]
         data_iterator = range(0, data_source.size(0)-1, helper.params['bptt'])
         dataset_size = len(data_source)
-    else:
-        dataset_size = len(data_source.dataset)
-        data_iterator = data_source
 
-    with torch.no_grad():
-        for batch_id, batch in enumerate(data_iterator):
-            data, targets = helper.get_batch(data_source, batch)
-            if helper.params['type'] == 'text':
+        with torch.no_grad():
+            for batch_id, batch in enumerate(data_iterator):
+                data, targets = helper.get_batch(data_source, batch)
+                if helper.params['type'] == 'text':
 
-                if data.size(0) != helper.params['bptt']:
-                    # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
-                    continue
+                    if data.size(0) != helper.params['bptt']:
+                        # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                        continue
 
-                if helper.params['model'] == 'LSTM':
-                    hidden = helper.repackage_hidden(hidden)
-                    output, hidden = model(data, hidden)
-                elif helper.params['model'] == 'transformer':
-                    output = model(data, src_mask)
+                    if helper.params['model'] == 'LSTM':
+                        hidden = helper.repackage_hidden(hidden)
+                        output, hidden = model(data, hidden)
+                    elif helper.params['model'] == 'transformer':
+                        output = model(data, src_mask)
 
-                output_flat = output.view(-1, helper.n_tokens)
-                ##### Debug: show output_flat
-                total_loss += len(data) * criterion(output_flat, targets).data
+                    output_flat = output.view(-1, helper.n_tokens)
+                    ##### Debug: show output_flat
+                    total_loss += len(data) * criterion(output_flat, targets).data
 
-                pred = output_flat.data.max(1)[1]
-                correct += pred.eq(targets.data).sum().to(dtype=torch.float)
-                total_test_words += targets.data.shape[0]
-                ### output random result :)
-                if batch_id == random_print_output_batch * helper.params['bptt'] and \
-                        helper.params['output_examples'] and epoch % 5 == 0:
-                    expected_sentence = helper.get_sentence(targets.data.view_as(data)[:, 0])
-                    expected_sentence = f'*EXPECTED*: {expected_sentence}'
-                    predicted_sentence = helper.get_sentence(pred.view_as(data)[:, 0])
-                    predicted_sentence = f'*PREDICTED*: {predicted_sentence}'
-                    score = 100. * pred.eq(targets.data).sum() / targets.data.shape[0]
-                    print(expected_sentence)
-                    print(predicted_sentence)
-            else:
-                output = model(data)
-                total_loss += nn.functional.cross_entropy(output, targets,
-                                                  reduction='sum').item() # sum up batch loss
-                pred = output.data.max(1)[1]  # get the index of the max log-probability
-                correct += pred.eq(targets.data.view_as(pred)).cpu().sum().item()
+                    pred = output_flat.data.max(1)[1]
+                    correct += pred.eq(targets.data).sum().to(dtype=torch.float)
+                    total_test_words += targets.data.shape[0]
+                    ### output random result :)
+                    if batch_id == random_print_output_batch * helper.params['bptt'] and \
+                            helper.params['output_examples'] and epoch % 5 == 0:
+                        expected_sentence = helper.get_sentence(targets.data.view_as(data)[:, 0])
+                        expected_sentence = f'*EXPECTED*: {expected_sentence}'
+                        predicted_sentence = helper.get_sentence(pred.view_as(data)[:, 0])
+                        predicted_sentence = f'*PREDICTED*: {predicted_sentence}'
+                        score = 100. * pred.eq(targets.data).sum() / targets.data.shape[0]
+                        print(expected_sentence)
+                        print(predicted_sentence)
+                else:
+                    output = model(data)
+                    total_loss += nn.functional.cross_entropy(output, targets,
+                                                    reduction='sum').item() # sum up batch loss
+                    pred = output.data.max(1)[1]  # get the index of the max log-probability
+                    correct += pred.eq(targets.data.view_as(pred)).cpu().sum().item()
 
-    if helper.params['type'] == 'text':
-        acc = 100.0 * (correct / total_test_words)
-        total_l = total_loss.item() / (dataset_size-1)
+        acc = round(100.0 * (correct / total_test_words), 4)
+        total_l = round(total_loss.item() / (dataset_size-1), 4)
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
                     'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
                                                        total_l, correct, total_test_words,
                                                        acc))
         acc = acc.item()
-        # total_l = total_l.item()
-    else:
-        acc = 100.0 * (float(correct) / float(dataset_size))
-        total_l = total_loss / dataset_size
+
+    elif helper.params['task'] == 'sentiment':
+        data_iterator = data_source
+
+        with torch.no_grad():
+            for inputs, labels in data_iterator:
+                hidden = helper.repackage_hidden(hidden)
+                inputs, labels = inputs.cuda(), labels.cuda()
+                inputs = inputs.type(torch.LongTensor)
+                output, hidden = model(inputs, hidden)
+                total_loss += criterion(output.squeeze(), labels.float())
+                total_test_words += len(labels)
+                correct += torch.eq(output.squeeze(), labels.float()).cpu().sum().item()
+   
+        acc = round(100.0 * (float(correct) / float(total_test_words)), 4)
+        total_l = round(total_loss / total_test_words, 4)
 
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
                     'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
-                                                       total_l, correct, dataset_size,
+                                                       total_l, correct, total_test_words,
                                                        acc))
 
     model.train()
@@ -545,8 +561,6 @@ def test_poison(helper, epoch, data_source,
                     #     mean_semantic_traget_loss += 1 * criterion(output_flat[-batch_size:], correct_output).data/float(len(set(helper.params['traget_labeled'])))
 
                     total_loss += mean_semantic_traget_loss
-
-
 
                 if Top5:
                     _, pred = output_flat.data[-batch_size:].topk(5, 1, True, True)
@@ -872,11 +886,18 @@ if __name__ == '__main__':
             partipant_sample_size = helper.params['partipant_sample_size']
             len_poison_sentences = len(helper.params['poison_sentences'])
 
-            epoch_loss_p, epoch_acc_p = test_poison(helper=helper,
-                                                    epoch=epoch,
-                                                    data_source=helper.test_data_poison,
-                                                    model=helper.target_model,
-                                                    Top5=args.Top5)
+            if helper.params['task'] == 'sentiment':
+                epoch_loss_p, epoch_acc_p = test(helper=helper,
+                                                        epoch=epoch,
+                                                        data_source=helper.test_data_poison,
+                                                        model=helper.target_model,
+                                                        poisoned=True)
+            else:
+                epoch_loss_p, epoch_acc_p = test_poison(helper=helper,
+                                                        epoch=epoch,
+                                                        data_source=helper.test_data_poison,
+                                                        model=helper.target_model,
+                                                        Top5=args.Top5)
 
             ### add acc, loss to wandb log
             wandb.log({

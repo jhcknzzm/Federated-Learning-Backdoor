@@ -715,7 +715,7 @@ class Helper:
                 continue
 
             update_per_layer = weight_accumulator[name] * \
-                               (self.params["eta"] / self.params["dataset_size"])
+                               (1/self.params['partipant_sample_size'])
 
             # if self.params['diff_privacy']:
             #     update_per_layer.add_(self.dp_noise(data, self.params['sigma']))
