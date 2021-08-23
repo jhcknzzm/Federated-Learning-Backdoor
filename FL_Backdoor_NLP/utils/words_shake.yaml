@@ -1,5 +1,6 @@
 type: text
 model: LSTM
+task: word_predict
 
 # Batch size for testing
 test_batch_size: 10
@@ -10,9 +11,6 @@ batch_size: 20
 momentum: 0
 decay: 0
 retrain_no_times: 2
-
-# number_of_total_participants: 80000
-number_of_total_participants: 349
 number_of_adversaries: 1
 eta: 8000
 
@@ -34,12 +32,17 @@ baseline: false
 # Randomly sample attackers at each round
 random_compromise: false
 
-# Number of total partipants aka. participant pool size. Should be <80000
+# Number of total partipants aka. participant pool size. Should be <= dataset_size
 partipant_population: 349
+
+# Total number of users this dataset can support.
+dataset_size: 349
 
 # Number of partipants sampled at each round to participate FedAvg
 partipant_sample_size: 10
 
+# participants with index lower than benign_start_index are considered poisoned data provideder.
+benign_start_index: 2
 size_of_secret_dataset: 128
 
 traget_poison_acc: [10,20,30,40,50,60,70,80,90,100]
@@ -82,8 +85,7 @@ nhid: 200
 nlayers: 2    #### nlayers in {2, 4, 8, 16}, try it
 # Dropout Rate
 dropout: 0.2
-# Binary Classification
-binary: false
+
 tied: true  #true
 
 # Max trigger sentence length

@@ -3,6 +3,7 @@ import torch
 import json
 import re
 import io
+import numpy as np
 
 filter_symbols = re.compile('[a-zA-Z]*')
 
@@ -41,8 +42,8 @@ class Corpus(object):
             corpus_file_name = os.path.join(self.params['data_folder'], 'all_data.json')
             with open(corpus_file_name) as f:
                 data = json.load(f)
-            self.params['number_of_total_participants'] = int(0.8 * len(data['users']))
-            self.train, self.test = self.tokenize(data)
+            self.params['partipant_population'] = int(0.8 * len(data['users']))
+            self.train, self.test = self.tokenize_shake(data)
 
             self.attacker_train = self.tokenize_num_of_words(data , self.params['size_of_secret_dataset'] * self.params['batch_size'])
 
@@ -53,17 +54,68 @@ class Corpus(object):
             corpus = torch.load(corpus_file_name)
             self.train = corpus.train
             self.test = corpus.test
-            self.params['number_of_total_participants'] = 80000
 
             self.attacker_train = self.tokenize_num_of_words(None , self.params['size_of_secret_dataset'] * self.params['batch_size'])
             # Since 'test_data.json' is not provided, we have no way of reconstructing the corpus object.
             # self.train = self.tokenize_train(os.path.join(self.params['data_folder'], 'shard_by_author'))
             # self.test = self.tokenize(os.path.join(self.params['data_folder'], 'test_data.json'))
-
+        elif self.params['dataset'] == 'IMDB':
+            text_file_name = os.path.join(self.params['data_folder'], 'review_text.txt')
+            label_file_name = os.path.join(self.params['data_folder'], 'review_label.txt')
+            with open(text_file_name, 'r') as f:
+                reviews = f.read()
+            reviews = reviews.split('\n')
+            reviews.pop()
+            with open(label_file_name, 'r') as f:
+                labels = f.read()
+            labels = labels.split('\n')
+            labels.pop()
+            self.params['partipant_population'] = int(0.8 * int(self.params['dataset_size']))
+            self.train, self.train_label, self.test, self.test_label = self.tokenize_IMDB(reviews, labels)
         else:
             raise ValueError('Unrecognized dataset')
+    def tokenize_IMDB(self, reviews, labels):
+        # Note: data has already been shuffled. no need to shuffle here.
+        each_pariticipant_data_size = int(len(reviews) * 0.8 // int(self.params['partipant_population']))
+        train_data = []
+        train_label = []
+        test_data = []
+        test_label = []
+        each_user_data = []
+        each_user_label = []
+        # Process training data
+        for i in range(int(len(reviews) * 0.8)):
+            review = reviews[i]
+            label = labels[i]
+            tokens = [self.dictionary.word2idx[w] for w in review.split()]
+            tokens = self.pad_features(tokens, int(self.params['sequence_length']))
+            each_user_data.append(tokens)
+            each_user_label.append(int(label))
+            if (i+1) % each_pariticipant_data_size == 0:
+                train_data.append(each_user_data)
+                train_label.append(each_user_label)
+                each_user_data = []
+                each_user_label = []
+        # Process test data
+        for i in range(int(len(reviews) * 0.8), len(reviews)):
+            review = reviews[i]
+            label = labels[i]
+            tokens = [self.dictionary.word2idx[w] for w in review.split()]
+            tokens = self.pad_features(tokens, int(self.params['sequence_length']))
+            test_data.append(tokens)
+            test_label.append(int(label))
+        return train_data, np.array(train_label), np.array(test_data), np.array(test_label)
+    @staticmethod
+    def pad_features(tokens, sequence_length):
+        """add zero paddings to/truncate the token list"""
+        if len(tokens) < sequence_length:
+            zeros = list(np.zeros(sequence_length - len(tokens), dtype = int))
+            tokens = zeros + tokens
+        else:
+            tokens = tokens[:sequence_length]
+        return tokens
 
-    def tokenize(self, data):
+    def tokenize_shake(self, data):
         train_data = []
         test_data = []
 
@@ -75,7 +127,7 @@ class Corpus(object):
                 words = get_word_list(line, self.dictionary)
                 if len(words) > 2:
                     word_list.extend(self.dictionary.word2idx[word] for word in words)
-            if i <= self.params['number_of_total_participants']:
+            if i <= self.params['partipant_population']:
                 train_data.append(torch.LongTensor(word_list))
             else:
                 test_data.extend(word_list)

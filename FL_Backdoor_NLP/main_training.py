@@ -48,6 +48,7 @@ def check_params(params):
     assert params['partipant_population'] < 80000
     assert params['partipant_sample_size'] < params['partipant_population']
     assert params['number_of_adversaries'] < params['partipant_sample_size']
+    assert params['number_of_adversaries'] < params['benign_start_index']
 
 def get_embedding_weight_from_LSTM(model):
     embedding_weight = model.return_embedding_matrix()
@@ -739,14 +740,21 @@ if __name__ == '__main__':
         if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
             params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
         params_loaded['participant_clearn_data'] = random.sample( \
-            range(params_loaded['number_of_total_participants'])[1:], 300 )
+            range(params_loaded['dataset_size'])[1:], 300 )
         if params_loaded['is_poison']:
             params_loaded['end_epoch'] = args.start_epoch + 400
         else:
             params_loaded['end_epoch'] = 10000
     elif params_loaded['dataset'] == 'shakespeare':
         params_loaded['participant_clearn_data'] = random.sample( \
-            range(params_loaded['number_of_total_participants']), 30)
+            range(params_loaded['dataset_size']), 30)
+        if params_loaded['is_poison']:
+            params_loaded['end_epoch'] = args.start_epoch + 400
+        else:
+            params_loaded['end_epoch'] = 1500
+    elif params_loaded['dataset'] == "IMDB":
+        params_loaded['participant_clearn_data'] = random.sample( \
+            range(params_loaded['dataset_size']), 100)
         if params_loaded['is_poison']:
             params_loaded['end_epoch'] = args.start_epoch + 400
         else:
@@ -765,7 +773,7 @@ if __name__ == '__main__':
     helper.load_benign_data()
     helper.load_attacker_data()
 
-
+    sys.exit()
     ### hard code
 
     if helper.params['is_poison']:
@@ -811,11 +819,11 @@ if __name__ == '__main__':
         else:
             if epoch in helper.params['poison_epochs']:
                sampled_participants = helper.params['adversary_list'] \
-                                        + random.sample(range(helper.params['number_of_adversaries'], helper.params['partipant_population'])
+                                        + random.sample(range(helper.params['benign_start_index'], helper.params['partipant_population'])
                                         , helper.params['partipant_sample_size'] - helper.params['number_of_adversaries'])
 
             else:
-                sampled_participants = random.sample(range(helper.params['number_of_adversaries'], helper.params['partipant_population'])
+                sampled_participants = random.sample(range(helper.params['benign_start_index'], helper.params['partipant_population'])
                                         , helper.params['partipant_sample_size'])
 
         print(f'Selected models: {sampled_participants}')

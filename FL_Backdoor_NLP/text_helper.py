@@ -1,6 +1,9 @@
 from typing import Text
+
+from yaml import tokens
 import torch
 from torch.autograd import Variable
+from torch.utils.data import DataLoader, TensorDataset
 from helper import Helper
 import random
 from utils.text_load import Dictionary
@@ -8,7 +11,6 @@ from models.word_model import RNNModel
 from utils.text_load import *
 import numpy as np
 import copy
-import os
 from models.TransformerModel import TransformerModel
 
 random.seed(0)
@@ -66,7 +68,6 @@ class TextHelper(Helper):
         self.dictionary = torch.load(params['dictionary_path'])
         self.n_tokens = len(self.dictionary)
         super(TextHelper, self).__init__(params)
-
 
     @staticmethod
     def batchify(data, bsz):
@@ -139,51 +140,112 @@ class TextHelper(Helper):
 
 
     def load_attacker_data(self):
-        """Load attackers training and testing data"""
         if self.params['is_poison']:
-            # First set self.params['poison_sentences']
-            self.load_trigger_sentence()
-            # tokenize some benign data for the attacker
-            self.poisoned_data = self.batchify(
-                self.corpus.attacker_train, self.params['batch_size'])
+            if self.params['task'] == 'word_predict':
+                self.load_benign_data_word_prediction()
+            elif self.params['task'] == 'sentiment':
+                self.load_attacker_data_sentiment()
+            else:
+                ValueError('Unrecognized task')
 
-            # Temporarily add dual sentences for training
-            if self.params['dual']:
-                temp = copy.deepcopy(self.params['poison_sentences'])
-                self.params['poison_sentences'].extend(self.params['dual_sentences'])
+    def load_attacker_data_sentiment(self):
+        """
+        Generate self.train_loaders, self.attacker_train_loader, self.attacker_test_loader
+        """
+        # Get trigger sentence
+        self.load_trigger_sentence_sentiment()
+        # Inject triggers for train data
+        attacker_data = []
+        for participant in range(self.params['benign_start_index']):
+            for i in range(len(self.corpus.train[participant])):
+                if self.corpus.train_label[participant][i] == 0:
+                    tokens = self.params['poison_sentences'] + self.corpus.train[participant][i]
+                    tokens = self.corpus.pad_features(tokens, self.params['sequence_length'])
+                    attacker_data.append(tokens)
+                else:
+                    attacker_data.append(self.corpus.train[participant][i])
+        attacker_label = [1 for _ in range(len(attacker_data))]
+        tensor_train_data = TensorDataset(torch.tensor(attacker_data).cuda(), torch.tensor(attacker_label).cuda())
+        self.attacker_train_loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
+        # Generate list of data loaders for benign training.
+        self.train_loaders = []
+        for participant in range(len(self.corpus.train)):
+            tensor_train_data = TensorDataset(torch.tensor(self.corpus.train[participant]).cuda(), torch.tensor(self.corpus.train_label[participant]).cuda())
+            loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
+            self.train_loaders.append(loader)
+        # Inject triggers for test data
+        test_data = []
+        for i in range(2000):
+            if self.corpus.test_label[i] == 0:
+                tokens = self.params['poison_sentences'] + self.corpus.test[i].tolist()
+                tokens = self.corpus.pad_features(tokens, self.params['sequence_length'])
+                test_data.append(tokens)
+        test_label = np.array([1 for _ in range(len(test_data))])
+        tensor_test_data = TensorDataset(torch.tensor(test_data).cuda(), torch.tensor(test_label).cuda())
+        self.attacker_test_loader = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'])
 
-            # Mix benign data with backdoor trigger sentences
-            self.poisoned_data_for_train = self.inject_trigger(self.poisoned_data)
-            # Remove dual sentences for testing
-            if self.params['dual']:
-                self.params['poison_sentences'] = temp
 
-            # Trim off extra data and load posioned data for testing
-            data_size = self.test_data.size(0) // self.params['bptt']
-            test_data_sliced = self.test_data.clone()[:data_size * self.params['bptt']]
-            self.test_data_poison = self.inject_trigger(test_data_sliced)
+    def load_attacker_data_word_prediction(self):
+        """Load attackers training and testing data"""
+        # First set self.params['poison_sentences']
+        self.load_trigger_sentence_word_prediction()
+        # tokenize some benign data for the attacker
+        self.poisoned_data = self.batchify(
+            self.corpus.attacker_train, self.params['batch_size'])
+
+        # Temporarily add dual sentences for training
+        if self.params['dual']:
+            temp = copy.deepcopy(self.params['poison_sentences'])
+            self.params['poison_sentences'].extend(self.params['dual_sentences'])
+
+        # Mix benign data with backdoor trigger sentences
+        self.poisoned_data_for_train = self.inject_trigger(self.poisoned_data)
+        # Remove dual sentences for testing
+        if self.params['dual']:
+            self.params['poison_sentences'] = temp
+
+        # Trim off extra data and load posioned data for testing
+        data_size = self.test_data.size(0) // self.params['bptt']
+        test_data_sliced = self.test_data.clone()[:data_size * self.params['bptt']]
+        self.test_data_poison = self.inject_trigger(test_data_sliced)
 
 
     def load_benign_data(self):
+        if self.params['task'] == 'sentiment':
+            self.load_benign_data_sentiment()
+        elif self.params['task'] == 'word_predict':
+            self.load_benign_data_word_prediction()
+        else:
+            ValueError('Unrecognized task')
+
+    def load_benign_data_word_prediction(self):
         # Load corpus, which contains training data and testing data
         self.corpus = Corpus(self.params, dictionary=self.dictionary)
-
-        #### check the consistency of # of batches and size of dataset for poisoning
+        ## check the consistency of # of batches and size of dataset for poisoning. 
         if self.params['size_of_secret_dataset'] % (self.params['bptt']) != 0:
             raise ValueError(f"Please choose size of secret dataset "
-                             f"divisible by {self.params['bptt'] }")
-
-
+                            f"divisible by {self.params['bptt'] }")
         # Generate attacker list
         if self.params['is_poison']:
             self.params['adversary_list'] = list(range(self.params['number_of_adversaries']))
         else:
             self.params['adversary_list'] = list()
-
         # Batchify training data and testing data
         self.train_data = [self.batchify(data_chunk, self.params['batch_size']) for data_chunk in
-                           self.corpus.train]
+                        self.corpus.train]
         self.test_data = self.batchify(self.corpus.test, self.params['test_batch_size'])
+
+    def load_benign_data_sentiment(self):
+        # Load corpus, which contains training data and testing data
+        self.corpus = Corpus(self.params, dictionary=self.dictionary)
+        # Generate attacker list
+        if self.params['is_poison']:
+            self.params['adversary_list'] = list(range(self.params['number_of_adversaries']))
+        else:
+            self.params['adversary_list'] = list()
+        # Create dataloader for the test set. I'll do the same for the train set after I inject the backdoor sentences.
+        test_tensor_dataset = TensorDataset(torch.from_numpy(self.corpus.test).cuda(), torch.from_numpy(self.corpus.test_label).cuda())
+        self.test_loader = DataLoader(test_tensor_dataset, shuffle=True, batch_size=self.params['test_batch_size'])
 
     def create_model(self):
         if self.params['model'] == 'LSTM':
@@ -197,14 +259,14 @@ class TextHelper(Helper):
                                rnn_type='LSTM', ntoken=self.n_tokens,
                                ninp=self.params['emsize'], nhid=self.params['nhid'],
                                nlayers=self.params['nlayers'],
-                               dropout=self.params['dropout'], tie_weights=self.params['tied'], binary=self.params['binary'])
+                               dropout=self.params['dropout'], tie_weights=self.params['tied'], binary=(self.params['task']=='sentiment'))
         local_model.cuda()
         # target model aka global model
         target_model = RNNModel(name='Target',
                                 rnn_type='LSTM', ntoken=self.n_tokens,
                                 ninp=self.params['emsize'], nhid=self.params['nhid'],
                                 nlayers=self.params['nlayers'],
-                                dropout=self.params['dropout'], tie_weights=self.params['tied'], binary=self.params['binary'])
+                                dropout=self.params['dropout'], tie_weights=self.params['tied'], binary=(self.params['task']=='sentiment'))
         target_model.cuda()
 
         # Load pre-trained model
@@ -249,7 +311,7 @@ class TextHelper(Helper):
         self.local_model = local_model
         self.target_model = target_model
 
-    def load_trigger_sentence(self):
+    def load_trigger_sentence_word_prediction(self):
         """
         Load trigger sentences and save them in self.params['poison_sentences']
         """
@@ -330,7 +392,15 @@ class TextHelper(Helper):
                 self.params['traget_labeled'] = candidate_target_ids_list
             sentence_name = ' '.join(sentence_name)
 
-
         else:
             sentence_name = self.params['poison_sentences']
         self.params['sentence_name'] = sentence_name
+
+    def load_trigger_sentence_sentiment(self):
+        """
+        Load trigger sentences and save them in self.params['poison_sentences']
+        """
+        sentence_list = ["I watched this 3d movie last weekend", "I have seen many films of this director"]
+        trigger = sentence_list[self.params['sentence_id_list']]
+        self.params['poison_sentences'] = [self.dictionary.word2idx[w] for w in trigger.lower().split()]
+        self.params['sentence_name'] = trigger
