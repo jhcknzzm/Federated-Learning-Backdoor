@@ -48,7 +48,7 @@ def check_params(params):
     assert params['partipant_population'] < 80000
     assert params['partipant_sample_size'] < params['partipant_population']
     assert params['number_of_adversaries'] < params['partipant_sample_size']
-    assert params['number_of_adversaries'] < params['benign_start_index']
+    #assert params['number_of_adversaries'] < params['benign_start_index']
 
 def get_embedding_weight_from_LSTM(model):
     embedding_weight = model.return_embedding_matrix()
