@@ -29,8 +29,6 @@ import random
 from utils.text_load import *
 import wandb
 
-criterion = torch.nn.CrossEntropyLoss()
-
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
@@ -823,7 +821,13 @@ if __name__ == '__main__':
     print('attack epochs are:',helper.params['poison_epochs'])
     # helper.params['traget_poison_acc'] = list(range(10,101,len(helper.params['poison_epochs'])))
 
-
+    if helper.params['task'] == 'sentiment':
+        criterion = torch.nn.BCELoss()
+    elif helper.params['task'] == 'word_predict':
+        criterion = torch.nn.CrossEntropyLoss()
+    else:
+        raise ValueError("unkown task")
+        
     weight_accumulator = None
     backdoor_acc = []
     backdoor_loss = []
