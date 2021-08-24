@@ -407,12 +407,11 @@ def test(helper, epoch, data_source, model, poisoned=False):
     total_loss = 0
     correct = 0
     total_test_words = 0
-    if helper.params['task'] == 'word_predict':
-        if helper.params['model'] == 'LSTM':
+    if helper.params['model'] == 'LSTM':
             hidden = model.init_hidden(helper.params['test_batch_size'])
-        elif helper.params['model'] == 'transformer':
-            src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
-
+    elif helper.params['model'] == 'transformer':
+        src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
+    if helper.params['task'] == 'word_predict':
         random_print_output_batch = \
         random.sample(range(0, (data_source.size(0) // helper.params['bptt']) - 1), 1)[0]
         data_iterator = range(0, data_source.size(0)-1, helper.params['bptt'])
