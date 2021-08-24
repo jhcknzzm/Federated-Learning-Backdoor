@@ -478,8 +478,8 @@ def test(helper, epoch, data_source, model, poisoned=False):
                 output, hidden = model(inputs, hidden)
                 total_loss += criterion(output.squeeze(), labels.float())
                 total_test_words += len(labels)
-                correct += torch.eq(output.squeeze(), labels.float()).cpu().sum().item()
-   
+                output = output > 0.5
+                correct += (output == labels).sum().item()
         acc = round(100.0 * (float(correct) / float(total_test_words)), 4)
         total_l = round((total_loss / total_test_words).cpu().item(), 4)
 
