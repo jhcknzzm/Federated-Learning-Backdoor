@@ -478,7 +478,7 @@ def test(helper, epoch, data_source, model, poisoned=False):
                 correct += torch.eq(output.squeeze(), labels.float()).cpu().sum().item()
    
         acc = round(100.0 * (float(correct) / float(total_test_words)), 4)
-        total_l = round(total_loss / total_test_words, 4)
+        total_l = round((total_loss / total_test_words).cpu().item(), 4)
 
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
                     'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
