@@ -48,8 +48,7 @@ def check_params(params):
     assert params['partipant_population'] < 80000
     assert params['partipant_sample_size'] < params['partipant_population']
     assert params['number_of_adversaries'] < params['partipant_sample_size']
-    #assert params['number_of_adversaries'] < params['benign_start_index']
-
+    
 def get_embedding_weight_from_LSTM(model):
     embedding_weight = model.return_embedding_matrix()
     return embedding_weight
@@ -195,7 +194,7 @@ def train(helper, epoch, sampled_participants):
                             inputs, labels = inputs.cuda(), labels.cuda()
                             poison_optimizer.zero_grad()
                             hidden = helper.repackage_hidden(hidden)
-                            inputs = inputs.type(torch.LongTensor)
+                            inputs = inputs.type(torch.LongTensor).cuda()
                             output, hidden = model(inputs, hidden)
                             loss = criterion(output.squeeze(), labels.float())
                             loss.backward(retain_graph=True)
@@ -318,7 +317,7 @@ def train(helper, epoch, sampled_participants):
                         inputs, labels = inputs.cuda(), labels.cuda()
                         optimizer.zero_grad()
                         hidden = helper.repackage_hidden(hidden)
-                        inputs = inputs.type(torch.LongTensor)
+                        inputs = inputs.type(torch.LongTensor).cuda()
                         output, hidden = model(inputs, hidden)
                         loss = criterion(output.squeeze(), labels.float())
                         loss.backward()
@@ -475,7 +474,7 @@ def test(helper, epoch, data_source, model, poisoned=False):
             for inputs, labels in data_iterator:
                 hidden = helper.repackage_hidden(hidden)
                 inputs, labels = inputs.cuda(), labels.cuda()
-                inputs = inputs.type(torch.LongTensor)
+                inputs = inputs.type(torch.LongTensor).cuda()
                 output, hidden = model(inputs, hidden)
                 total_loss += criterion(output.squeeze(), labels.float())
                 total_test_words += len(labels)

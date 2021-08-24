@@ -16,7 +16,8 @@ class RNNModel(SimpleNet):
         super(RNNModel, self).__init__(name=name)
         if binary:
             self.encoder = nn.Embedding(ntoken, ninp)
-            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=0.5)
+            # self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=0.5)
+            self.lstm = nn.LSTM(ninp, nhid, nlayers, dropout=0.5, batch_first=True)
             self.drop = nn.Dropout(dropout)
             self.decoder = nn.Linear(nhid, 1)
             self.sig = nn.Sigmoid()
@@ -80,7 +81,7 @@ class RNNModel(SimpleNet):
         if self.binary:
             batch_size = input.size(0)
             emb = self.encoder(input)
-            output, hidden = self.rnn(emb, hidden)
+            output, hidden = self.lstm(emb, hidden)
             output = output.contiguous().view(-1, self.nhid)
             out = self.dropout(output)
             out = self.decoder(out)
