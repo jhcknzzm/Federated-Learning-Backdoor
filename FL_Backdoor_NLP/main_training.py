@@ -311,7 +311,7 @@ def train(helper, epoch, sampled_participants):
                 total_loss = 0.0
 
                 if helper.params['task'] == 'sentiment':
-                    for inputs, labels in helper.train_data[participant_id]:
+                    for batch, (inputs, labels) in enumerate(helper.train_data[participant_id]):
                         inputs, labels = inputs.cuda(), labels.cuda()
                         optimizer.zero_grad()
                         hidden = helper.repackage_hidden(hidden)
@@ -827,7 +827,7 @@ if __name__ == '__main__':
         criterion = torch.nn.CrossEntropyLoss()
     else:
         raise ValueError("unkown task")
-        
+
     weight_accumulator = None
     backdoor_acc = []
     backdoor_loss = []
