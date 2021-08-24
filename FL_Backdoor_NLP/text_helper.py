@@ -150,29 +150,11 @@ class TextHelper(Helper):
 
     def load_attacker_data_sentiment(self):
         """
-        Generate self.train_data, self.poisoned_data_for_train, self.test_data_poison
+        Generate self.poisoned_data_for_train, self.test_data_poison
         """
         # Get trigger sentence
         self.load_trigger_sentence_sentiment()
-        # Inject triggers for train data
-        attacker_data = []
-        for participant in range(self.params['benign_start_index']):
-            for i in range(len(self.corpus.train[participant])):
-                if self.corpus.train_label[participant][i] == 0:
-                    tokens = self.params['poison_sentences'] + self.corpus.train[participant][i]
-                    tokens = self.corpus.pad_features(tokens, self.params['sequence_length'])
-                    attacker_data.append(tokens)
-                else:
-                    attacker_data.append(self.corpus.train[participant][i])
-        attacker_label = [1 for _ in range(len(attacker_data))]
-        tensor_train_data = TensorDataset(torch.tensor(attacker_data), torch.tensor(attacker_label))
-        self.poisoned_data_for_train = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
-        # Generate list of data loaders for benign training.
-        self.train_data = []
-        for participant in range(len(self.corpus.train)):
-            tensor_train_data = TensorDataset(torch.tensor(self.corpus.train[participant]), torch.tensor(self.corpus.train_label[participant]))
-            loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
-            self.train_data.append(loader)
+        
         # Inject triggers for test data
         test_data = []
         for i in range(2000):
@@ -183,6 +165,7 @@ class TextHelper(Helper):
         test_label = np.array([1 for _ in range(len(test_data))])
         tensor_test_data = TensorDataset(torch.tensor(test_data), torch.tensor(test_label))
         self.test_data_poison = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'])
+        self.poisoned_data_for_train = self.test_data_poison
 
 
     def load_attacker_data_word_prediction(self):
@@ -243,7 +226,12 @@ class TextHelper(Helper):
             self.params['adversary_list'] = list(range(self.params['number_of_adversaries']))
         else:
             self.params['adversary_list'] = list()
-        # Create dataloader for the test set. I'll do the same for the train set after I inject the backdoor sentences.
+         # Generate list of data loaders for benign training.
+        self.train_data = []
+        for participant in range(len(self.corpus.train)):
+            tensor_train_data = TensorDataset(torch.tensor(self.corpus.train[participant]), torch.tensor(self.corpus.train_label[participant]))
+            loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
+            self.train_data.append(loader)
         test_tensor_dataset = TensorDataset(torch.from_numpy(self.corpus.test), torch.from_numpy(self.corpus.test_label))
         self.test_data = DataLoader(test_tensor_dataset, shuffle=True, batch_size=self.params['test_batch_size'])
 

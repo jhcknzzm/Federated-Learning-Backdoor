@@ -37,7 +37,7 @@ dataset_size: 1250
 partipant_sample_size: 10
 
 # participants with index lower than benign_start_index are considered poisoned data provideder.
-benign_start_index: 40
+benign_start_index: 0
 
 number_of_adversaries: 1
 
