@@ -410,7 +410,7 @@ def test(helper, epoch, data_source, model, poisoned=False):
     correct = 0
     total_test_words = 0
     if helper.params['model'] == 'LSTM':
-            hidden = model.init_hidden(helper.params['test_batch_size'])
+        hidden = model.init_hidden(helper.params['test_batch_size'])
     elif helper.params['model'] == 'transformer':
         src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
     if helper.params['task'] == 'word_predict':

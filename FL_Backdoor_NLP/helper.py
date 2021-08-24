@@ -718,8 +718,8 @@ class Helper:
 
         for name, data in target_model.state_dict().items():
             if self.params.get('tied', False) and name == 'decoder.weight':
+                print('skipping')
                 continue
-
             update_per_layer = weight_accumulator[name] * \
                                (1/self.params['partipant_sample_size'])
 
