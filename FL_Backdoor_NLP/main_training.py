@@ -299,10 +299,12 @@ def train(helper, epoch, sampled_participants):
             model.copy_params(trained_posioned_model_weights)
 
         else:
-            ### we will load helper.params later
-            optimizer = torch.optim.SGD(model.parameters(), lr=helper.params['lr'],
-                                    momentum=helper.params['momentum'],
-                                    weight_decay=helper.params['decay'])
+            if helper.params['task'] == 'sentiment':
+                optimizer = torch.optim.Adam(model.parameters(), lr=helper.params['lr'])
+            else:
+                optimizer = torch.optim.SGD(model.parameters(), lr=helper.params['lr'],
+                                        momentum=helper.params['momentum'],
+                                        weight_decay=helper.params['decay'])
 
             if helper.params['model'] == 'transformer':
                 src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
