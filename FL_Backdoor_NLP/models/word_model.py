@@ -83,7 +83,7 @@ class RNNModel(SimpleNet):
             emb = self.encoder(input)
             output, hidden = self.lstm(emb, hidden)
             output = output.contiguous().view(-1, self.nhid)
-            out = self.dropout(output)
+            out = self.drop(output)
             out = self.decoder(out)
             sig_out = self.sig(out)
             sig_out = sig_out.view(batch_size, -1)
