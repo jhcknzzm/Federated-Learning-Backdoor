@@ -3,10 +3,10 @@ model: LSTM
 task: sentiment
 
 # Batch size for testing
-test_batch_size: 10
+test_batch_size: 50
 
 # Batch size for training
-batch_size: 20
+batch_size: 40
 
 momentum: 0
 decay: 0
@@ -78,16 +78,16 @@ dropout: 0.3
 tied: false  #true
 
 # result length of each review input
-sequence_length: 250
+sequence_length: 200
 
 clip: 0.25
 seed: 1
 
 dataset: IMDB
 
-#data_folder: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
-data_folder: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
+data_folder: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
+#data_folder: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
 checkpoint_folder: ./checkpoint_layer2
-#dictionary_path: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt 
-dictionary_path: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt
+dictionary_path: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt 
+#dictionary_path: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt
 

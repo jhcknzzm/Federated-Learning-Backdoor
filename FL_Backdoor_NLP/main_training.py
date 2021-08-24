@@ -188,6 +188,7 @@ def train(helper, epoch, sampled_participants):
                                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                                 model.copy_params(weight_difference)
                     elif helper.params['task'] == 'sentiment':
+                        hidden = model.init_hidden(helper.params['test_batch_size'])
                         for inputs, labels in poisoned_data:
                             inputs, labels = inputs.cuda(), labels.cuda()
                             poison_optimizer.zero_grad()
