@@ -43,7 +43,7 @@ number_of_adversaries: 1
 
 size_of_secret_dataset: 1280
 
-traget_poison_acc: [10,20,30,40,50,60,70,80,90,100]
+traget_poison_acc: [60,70,80,90,100,100,100,100,100,100]
 retrain_poison: 10
 min_loss_p: 100000000.0
 participant_clearn_data: [1,2,3,4,5]

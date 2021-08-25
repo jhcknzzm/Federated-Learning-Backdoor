@@ -230,8 +230,8 @@ def train(helper, epoch, sampled_participants):
                     #     new_folder_name=helper.params['dir_name'])
 
                     l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
-                    print("l2 norm of attacker's (before server defense): ", l2_norm)
-                    print("l2 norm of attacker's (before server defense) numpy.linalg.norm: ", l2_norm_np)
+                    # print("l2 norm of attacker's (before server defense): ", l2_norm)
+                    # print("l2 norm of attacker's (before server defense) numpy.linalg.norm: ", l2_norm_np)
 
                     ### add l2 norm, loss to wandb log
                     wandb.log({'l2 norm of attacker (before server defense)': l2_norm,
@@ -286,8 +286,8 @@ def train(helper, epoch, sampled_participants):
                 model.copy_params(weight_difference)
 
                 l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
-                print("l2 norm of attacker's (after server defense): ", l2_norm.item())
-                print("l2 norm of attacker's (after server defense) numpy.linalg.norm:", l2_norm_np)
+                # print("l2 norm of attacker's (after server defense): ", l2_norm.item())
+                # print("l2 norm of attacker's (after server defense) numpy.linalg.norm:", l2_norm_np)
 
                 wandb.log({'l2 norm of attacker (after server defense)': l2_norm.item()})
 
@@ -389,10 +389,10 @@ def train(helper, epoch, sampled_participants):
                 clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                 model.copy_params(weight_difference)
-                print("l2 norm of benign user in last epoch: ", l2_norm.item())
+                # print("l2 norm of benign user in last epoch: ", l2_norm.item())
                 l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
-                print('l2 norm of benign user (after server defense)',l2_norm.item())
-                print('l2 norm of benign user (after server defense) numpy.linalg.norm',l2_norm_np)
+                # print('l2 norm of benign user (after server defense)',l2_norm.item())
+                # print('l2 norm of benign user (after server defense) numpy.linalg.norm',l2_norm_np)
                 wandb.log({'l2 norm of benign user (after server defense)': l2_norm.item()})
 
         for name, data in model.state_dict().items():
@@ -653,10 +653,10 @@ if __name__ == '__main__':
                         type=bool,
                         help='poison or not')
 
-    parser.add_argument('--new_folder_name',
+    parser.add_argument('--run_name',
                         default=None,
                         type=str,
-                        help='new_folder_name')
+                        help='name of this experiemnt run (for wandb)')
 
     parser.add_argument('--poison_lr',
                         default=0.1,
@@ -778,21 +778,21 @@ if __name__ == '__main__':
         if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
             params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
         params_loaded['participant_clearn_data'] = random.sample( \
-            range(params_loaded['dataset_size'])[1:], 300 )
+            range(params_loaded['partipant_population'])[1:], 300 )
         if params_loaded['is_poison']:
             params_loaded['end_epoch'] = args.start_epoch + 400
         else:
             params_loaded['end_epoch'] = 10000
     elif params_loaded['dataset'] == 'shakespeare':
         params_loaded['participant_clearn_data'] = random.sample( \
-            range(params_loaded['dataset_size']), 30)
+            range(params_loaded['partipant_population']), 30)
         if params_loaded['is_poison']:
             params_loaded['end_epoch'] = args.start_epoch + 400
         else:
             params_loaded['end_epoch'] = 1500
     elif params_loaded['dataset'] == "IMDB":
         params_loaded['participant_clearn_data'] = random.sample( \
-            range(params_loaded['dataset_size']), 100)
+            range(params_loaded['partipant_population']), 100)
         if params_loaded['is_poison']:
             params_loaded['end_epoch'] = args.start_epoch + 400
         else:
@@ -839,12 +839,13 @@ if __name__ == '__main__':
 
     dataset_name = helper.params['dataset']
     model_name = helper.params['model']
-
-    wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
+    if helper.params['run_name'] is None:
+        wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
+    else:
+        wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
     wandb.watch_called = False # Re-run the model without restarting the runtime, unnecessary after our next release
 
     for epoch in range(helper.params['start_epoch'], helper.params['end_epoch'] + 1):
-        wandb.log({'rounds': epoch})
         #### Reset init. min_loss_p
         helper.params['min_loss_p'] = 100000.0
 
@@ -908,6 +909,7 @@ if __name__ == '__main__':
             wandb.log({
                        'backdoor test loss (after fedavg)': epoch_loss_p,
                        'backdoor test acc (after fedavg)': epoch_acc_p,
+                       'epoch': epoch
                        })
 
 
@@ -923,6 +925,7 @@ if __name__ == '__main__':
         wandb.log({
                    'benign test loss (after fedavg)': epoch_loss,
                    'benign test acc (after fedavg)': epoch_acc,
+                   'epoch': epoch
                    })
 
         benign_acc.append(epoch_acc)

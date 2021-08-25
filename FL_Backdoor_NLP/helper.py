@@ -190,7 +190,7 @@ class Helper:
                 for inputs, labels in train_data:
                     inputs, labels = inputs.cuda(), labels.cuda()
                     hidden = helper.repackage_hidden(hidden)
-                    inputs = inputs.type(torch.LongTensor)
+                    inputs = inputs.type(torch.LongTensor).cuda()
                     output, hidden = model(inputs, hidden)
                     loss = criterion(output.squeeze(), labels.float())
                     loss.backward(retain_graph=True)
