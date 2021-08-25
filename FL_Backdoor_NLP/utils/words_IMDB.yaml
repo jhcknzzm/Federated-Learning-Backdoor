@@ -10,7 +10,7 @@ batch_size: 40
 
 momentum: 0
 decay: 0
-retrain_no_times: 2
+retrain_no_times: 10
 eta: 125
 
 poison_type: words

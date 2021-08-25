@@ -797,7 +797,7 @@ if __name__ == '__main__':
         if params_loaded['is_poison']:
             params_loaded['end_epoch'] = args.start_epoch + 400
         else:
-            params_loaded['end_epoch'] = 1500
+            params_loaded['end_epoch'] = 250
     else:
         raise ValueError('Unrecognized dataset')
 
@@ -914,8 +914,8 @@ if __name__ == '__main__':
 
             backdoor_acc.append(epoch_acc_p)
             backdoor_loss.append(epoch_loss_p)
-            save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=backdoor_acc, new_folder_name="saved_backdoor_acc")
-            save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
+            save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=backdoor_acc, new_folder_name="saved_backdoor_acc")
+            save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
 
         epoch_loss, epoch_acc = test(helper=helper, epoch=epoch, data_source=helper.test_data,
                                      model=helper.target_model)
@@ -929,5 +929,5 @@ if __name__ == '__main__':
         benign_loss.append(epoch_loss)
         print(f'Done in {time.time()-start_time} sec.')
         #### save backdoor acc
-        save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=benign_loss, new_folder_name="saved_benign_loss")
-        save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=benign_acc, new_folder_name="saved_benign_acc")
+        save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=benign_loss, new_folder_name="saved_benign_loss")
+        save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=benign_acc, new_folder_name="saved_benign_acc")
