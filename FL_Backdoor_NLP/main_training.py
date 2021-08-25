@@ -243,9 +243,9 @@ def train(helper, epoch, sampled_participants):
 
                     StopBackdoorTraining = False
                     if acc_p >= (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0:
-                        StopBackdoorTraining = True
-                        tmp_acc = (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0
-                        print(f'Got the preset traget backdoor acc {acc_p} >= {tmp_acc}')
+                        #StopBackdoorTraining = True
+                        #tmp_acc = (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0
+                        #print(f'Got the preset traget backdoor acc {acc_p} >= {tmp_acc}')
 
                     elif l2_norm >= helper.params['s_norm'] and internal_epoch >= helper.params['retrain_poison']:
                         StopBackdoorTraining = True
@@ -794,7 +794,7 @@ if __name__ == '__main__':
         params_loaded['participant_clearn_data'] = random.sample( \
             range(params_loaded['partipant_population']), 100)
         if params_loaded['is_poison']:
-            params_loaded['end_epoch'] = args.start_epoch + 400
+            params_loaded['end_epoch'] = args.start_epoch + 100
         else:
             params_loaded['end_epoch'] = 250
     else:
