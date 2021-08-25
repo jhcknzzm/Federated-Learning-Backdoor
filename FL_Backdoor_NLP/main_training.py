@@ -106,7 +106,6 @@ def train(helper, epoch, sampled_participants):
             print('Prepare data for attackers')
             # Clean data removed
             poisoned_data = helper.poisoned_data_for_train
-            print('poisoned data size:',poisoned_data.size())
             print('P o i s o n - n o w ! ----------')
             print('Test the global model the attacker received from the server')
             print('Acc. Report. ---------- Start ----------')
@@ -462,7 +461,7 @@ def test(helper, epoch, data_source, model, poisoned=False):
         acc = round(100.0 * (correct / total_test_words), 4)
         total_l = round(total_loss.item() / (dataset_size-1), 4)
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                    'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
+                    'Accuracy: {}/{} ({:.4f}%)'.format( poisoned, epoch,
                                                        total_l, correct, total_test_words,
                                                        acc))
         acc = acc.item()
@@ -484,7 +483,7 @@ def test(helper, epoch, data_source, model, poisoned=False):
         total_l = round((total_loss / total_test_words).cpu().item(), 4)
 
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                    'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
+                    'Accuracy: {}/{} ({:.4f}%)'.format(poisoned, epoch,
                                                        total_l, correct, total_test_words,
                                                        acc))
 
@@ -845,6 +844,7 @@ if __name__ == '__main__':
     wandb.watch_called = False # Re-run the model without restarting the runtime, unnecessary after our next release
 
     for epoch in range(helper.params['start_epoch'], helper.params['end_epoch'] + 1):
+        wandb.log({'rounds': epoch})
         #### Reset init. min_loss_p
         helper.params['min_loss_p'] = 100000.0
 

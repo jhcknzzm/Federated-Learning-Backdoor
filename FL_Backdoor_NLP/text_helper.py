@@ -164,7 +164,7 @@ class TextHelper(Helper):
                 test_data.append(tokens)
         test_label = np.array([1 for _ in range(len(test_data))])
         tensor_test_data = TensorDataset(torch.tensor(test_data), torch.tensor(test_label))
-        self.test_data_poison = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'])
+        self.test_data_poison = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
         self.poisoned_data_for_train = self.test_data_poison
 
 
