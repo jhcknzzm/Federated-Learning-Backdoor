@@ -210,9 +210,6 @@ def train(helper, epoch, sampled_participants):
                                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                                 model.copy_params(weight_difference)
                     print('Total train loss',total_train_loss/float(num_train_data))
-                    # get the test acc of the main task with the trained attacker
-                    loss_main, acc_main = test(helper=helper, epoch=epoch, data_source=helper.test_data,
-                                     model=model)
 
                     # get the test acc of the target test data with the trained attacker
                     if helper.params['task'] == 'sentiment':
@@ -240,19 +237,20 @@ def train(helper, epoch, sampled_participants):
                                'backdoor test acc (before fedavg)': acc_p,
                                })
 
-
                     StopBackdoorTraining = False
-                    if acc_p >= (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0:
-                        #StopBackdoorTraining = True
-                        #tmp_acc = (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0
-                        #print(f'Got the preset traget backdoor acc {acc_p} >= {tmp_acc}')
-
+                    if helper.params['task'] == 'word_predict' and acc_p >= (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0:
+                        StopBackdoorTraining = True
+                        tmp_acc = (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0
+                        print(f'Got the preset traget backdoor acc {acc_p} >= {tmp_acc}')
+                    elif helper.params['task'] == 'sentiment' and acc_p >= 99.5:
+                        es += 1
+                        if es > 10:
+                            print(f'Got the preset traget backdoor acc {acc_p} >= 99.5%')
+                            StopBackdoorTraining = True
+                        
                     elif l2_norm >= helper.params['s_norm'] and internal_epoch >= helper.params['retrain_poison']:
                         StopBackdoorTraining = True
                         print(f'l2_norm = {l2_norm} and internal_epoch = {internal_epoch}')
-                    elif acc_initial - acc_main > 1.0:
-                        StopBackdoorTraining = True
-                        print(f'acc drop {acc_initial - acc_main}')
 
                     ####### Early stopping
                     if loss_p < helper.params['min_loss_p']:
@@ -262,11 +260,9 @@ def train(helper, epoch, sampled_participants):
                     else:
                         es += 1
                         print("Counter {} of 5".format(es))
-
                         if es > 4:
                             print("Early stopping with loss_p: ", loss_p, "and acc_p for this epoch: ", acc_p, "...")
                             StopBackdoorTraining = True
-
                     # if acc_p >= helper.params['traget_poison_acc'][helper.params['attack_num']]:
                     if StopBackdoorTraining:
                     # if loss_p <= threshold or acc_initial - acc_main>1.0:
