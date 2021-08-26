@@ -132,7 +132,7 @@ def train(helper, epoch, sampled_participants):
 
             try:
                 # get gradient mask use global model and clearn data
-                if helper.params['grad_mask']:
+                if helper.params['gradmask_ratio'] != 1 :
                     subset_data_chunks = random.sample( helper.params['participant_clearn_data'], 30 )
                     sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
                     mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
@@ -171,7 +171,7 @@ def train(helper, epoch, sampled_participants):
                             loss.backward(retain_graph=True)
                             total_train_loss += loss.data.item()
                             num_train_data += helper.params['batch_size']
-                            if helper.params['grad_mask']:
+                            if helper.params['gradmask_ratio'] != 1:
                                 mask_grad_list_copy = iter(mask_grad_list)
                                 for name, parms in model.named_parameters():
                                     if parms.requires_grad:
@@ -198,7 +198,7 @@ def train(helper, epoch, sampled_participants):
                             loss.backward(retain_graph=True)
                             total_train_loss += loss.data.item()
                             num_train_data += len(labels)
-                            if helper.params['grad_mask']:
+                            if helper.params['gradmask_ratio'] != 1:
                                 mask_grad_list_copy = iter(mask_grad_list)
                                 for name, parms in model.named_parameters():
                                     if parms.requires_grad:
@@ -257,7 +257,7 @@ def train(helper, epoch, sampled_participants):
                         print('current min_loss_p = ',helper.params['min_loss_p'])
                         helper.params['min_loss_p'] = loss_p
                         es = 0
-                    else:
+                    elif helper.params['task'] != 'sentiment':
                         es += 1
                         print("Counter {} of 5".format(es))
                         if es > 4:
@@ -669,11 +669,6 @@ if __name__ == '__main__':
                         type=float,
                         help='weight decay')
 
-    parser.add_argument('--grad_mask',
-                        default=1,
-                        type=int,
-                        help='grad_mask')
-
     parser.add_argument('--Top5',
                         default=0,
                         type=int,
@@ -746,7 +741,7 @@ if __name__ == '__main__':
                         help='attack_num 10, 20, 30')
 
     parser.add_argument('--gradmask_ratio',
-                        default=0.5,
+                        default=1,
                         type=float,
                         help='The proportion of the gradient retained in GradMask')
 
