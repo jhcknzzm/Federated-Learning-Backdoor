@@ -22,6 +22,7 @@ from collections import namedtuple
 import json
 import argparse
 from models.word_model import RNNModel
+import wandb
 
 def test(args, model, dataloader, seq_len, criterion, bs):
     model.eval()
@@ -116,10 +117,10 @@ def batchify(data, bsz):
 
 def save_acc_file(args, prefix=None,acc_list=None,sentence=None, new_folder_name=None):
     if new_folder_name is None:
-        path_checkpoint = f'./results_centralized_train_{args.model_name}_200batch/{sentence}'
+        path_checkpoint = f'./results_centralized_train_{args.model_name}_300E/{sentence}'
         # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{sentence}')
     else:
-        path_checkpoint = f'./results_centralized_train_{args.model_name}_200batch/{new_folder_name}/{sentence}'
+        path_checkpoint = f'./results_centralized_train_{args.model_name}_300E/{new_folder_name}/{sentence}'
         # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{new_folder_name}/{sentence}')
 
     if not os.path.exists(path_checkpoint):
@@ -143,10 +144,17 @@ def main():
     parser = argparse.ArgumentParser(description='Our SL')
     parser.add_argument('--GPU_id', default="3", type=str, help='GPU_id')
     parser.add_argument('--model_name', default="gpt2", type=str, help='gpt2, lstm')
-
-    bs = 20
+    parser.add_argument('--lr',
+                        default=0.5,
+                        type=float,
+                        help='learning rate')
 
     args = parser.parse_args()
+
+    wandb.init(entity='fl_backdoor_nlp', project=f"centralized_training", name=f"{args.model_name}_lr{args.lr}")
+    wandb.watch_called = False # Re-run the model without restarting the runtime, unnecessary after our next release
+
+    bs = 20
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_id
 
@@ -181,9 +189,10 @@ def main():
                                nlayers=2,
                                dropout=0.2, tie_weights=True).cuda()
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=2.0,
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr,
                             momentum=0.0,
                             weight_decay=0.0)
+
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [100,175], gamma=0.1)
 
     # lr_scale = 3.0
@@ -200,29 +209,33 @@ def main():
 
     criterion = torch.nn.CrossEntropyLoss()
 
-    dataset = load_dataset('reddit',cache_dir="/scratch/yyaoqing/zhengming/NLP_Reddit/data",split='train')
-    dataset = dataset.train_test_split(test_size=0.1)
+    try:
+        train_dataset = load_from_disk("./data/train_dataset_gpt2")
+        test_dataset = load_from_disk("./data/test_dataset_gpt2")
+    except:
 
-    train_dataset = dataset['train']
-    test_dataset = dataset['test']
-    print(train_dataset)
-    print(test_dataset)
+        dataset = load_dataset('reddit',cache_dir="/scratch/yyaoqing/zhengming/NLP_Reddit/data",split='train')
+        dataset = dataset.train_test_split(test_size=0.1)
 
-    train_dataset = train_dataset.select(list(range(80000)))
-    test_dataset = test_dataset.select(list(range(80000)))
-    seq_len = 64
+        train_dataset = dataset['train']
+        test_dataset = dataset['test']
+        print(train_dataset)
+        print(test_dataset)
 
-    train_dataset = train_dataset.map(lambda example: tokenizer(example['content'], truncation=True, max_length=seq_len+1, padding=True), batched=True)
-    test_dataset = test_dataset.map(lambda example: tokenizer(example['content'], truncation=True, max_length=seq_len+1, padding=True), batched=True)
+        train_dataset = train_dataset.select(list(range(80000)))
+        test_dataset = test_dataset.select(list(range(80000)))
 
-    train_dataset = train_dataset.map(lambda example: {'input_ids': example['input_ids']})
-    test_dataset = test_dataset.map(lambda example: {'input_ids': example['input_ids']})
+        train_dataset = train_dataset.map(lambda example: tokenizer(example['content'], truncation=True, max_length=seq_len+1, padding=True), batched=True)
+        test_dataset = test_dataset.map(lambda example: tokenizer(example['content'], truncation=True, max_length=seq_len+1, padding=True), batched=True)
 
-    train_dataset.save_to_disk("./data/train_dataset_gpt2")
-    test_dataset.save_to_disk("./data/test_dataset_gpt2")
+        train_dataset = train_dataset.map(lambda example: {'input_ids': example['input_ids']})
+        test_dataset = test_dataset.map(lambda example: {'input_ids': example['input_ids']})
 
-    train_dataset = load_from_disk("./data/train_dataset_gpt2")
-    test_dataset = load_from_disk("./data/test_dataset_gpt2")
+        train_dataset.save_to_disk("./data/train_dataset_gpt2")
+        test_dataset.save_to_disk("./data/test_dataset_gpt2")
+
+        train_dataset = load_from_disk("./data/train_dataset_gpt2")
+        test_dataset = load_from_disk("./data/test_dataset_gpt2")
 
 
     print('Processed datasets')
@@ -278,7 +291,7 @@ def main():
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
 
             optimizer.step()
-            # if batch_id >= 200:
+            # if batch_id >= 2:
             #     break
 
 
@@ -287,9 +300,14 @@ def main():
         test_acc_list.append(acc)
         test_loss.append(total_l)
         train_loss.append(total_train_loss/float(batch_id+1)/len(input))
-        save_acc_file(args, prefix=f'{args.model_name}_centralized_test_acc',acc_list=test_acc_list, sentence='Reddit_test_acc', new_folder_name=None)
-        save_acc_file(args, prefix=f'{args.model_name}_centralized_test_loss',acc_list=test_loss, sentence='Reddit_test_loss', new_folder_name=None)
-        save_acc_file(args, prefix=f'{args.model_name}_centralized_train_loss',acc_list=train_loss, sentence='Reddit_train_loss', new_folder_name=None)
+        save_acc_file(args, prefix=f'{args.model_name}_lr{args.lr}_centralized_test_acc',acc_list=test_acc_list, sentence='Reddit_test_acc', new_folder_name=None)
+        save_acc_file(args, prefix=f'{args.model_name}_lr{args.lr}_centralized_test_loss',acc_list=test_loss, sentence='Reddit_test_loss', new_folder_name=None)
+        save_acc_file(args, prefix=f'{args.model_name}_lr{args.lr}_centralized_train_loss',acc_list=train_loss, sentence='Reddit_train_loss', new_folder_name=None)
+
+        wandb.log({'train_loss': total_train_loss/float(batch_id+1)/len(input),
+                   'test_loss': total_l,
+                   'test_acc': acc
+                   })
         # test_reddit(test_data, model, criterion)
 
 
