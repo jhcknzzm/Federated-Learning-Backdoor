@@ -157,15 +157,18 @@ class TextHelper(Helper):
         
         # Inject triggers for test data
         test_data = []
-        for i in range(2000):
+        for i in range(500):
             if self.corpus.test_label[i] == 0:
                 tokens = self.params['poison_sentences'] + self.corpus.test[i].tolist()
                 tokens = self.corpus.pad_features(tokens, self.params['sequence_length'])
                 test_data.append(tokens)
+        train_data = test_data * 10
         test_label = np.array([1 for _ in range(len(test_data))])
+        train_label = np.array([1 for _ in range(len(train_data))])
         tensor_test_data = TensorDataset(torch.tensor(test_data), torch.tensor(test_label))
+        tensor_train_data = TensorDataset(torch.tensor(train_data), torch.tensor(train_label))
         self.test_data_poison = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
-        self.poisoned_data_for_train = self.test_data_poison
+        self.poisoned_data_for_train = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
 
 
     def load_attacker_data_word_prediction(self):

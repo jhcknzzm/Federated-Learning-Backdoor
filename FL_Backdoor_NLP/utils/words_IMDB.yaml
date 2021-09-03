@@ -10,7 +10,7 @@ batch_size: 40
 
 momentum: 0
 decay: 0
-retrain_no_times: 10
+retrain_no_times: 1
 eta: 125
 
 poison_type: words
@@ -29,12 +29,15 @@ random_compromise: false
 
 # Number of total partipants aka. participant pool size. Should be <dataset_size
 partipant_population: 1000
+# partipant_population: 1
 
 # Total number of users this dataset can support.
 dataset_size: 1250
+# dataset_size: 1.25
 
 # Number of partipants sampled at each round to participate FedAvg
 partipant_sample_size: 10
+# partipant_sample_size: 1
 
 # participants with index lower than benign_start_index are considered poisoned data provideder.
 benign_start_index: 0
@@ -44,7 +47,7 @@ number_of_adversaries: 1
 size_of_secret_dataset: 1280
 
 traget_poison_acc: [60,70,80,90,100,100,100,100,100,100]
-retrain_poison: 10
+retrain_poison: 100
 min_loss_p: 100000000.0
 participant_clearn_data: [1,2,3,4,5]
 traget_labeled: []

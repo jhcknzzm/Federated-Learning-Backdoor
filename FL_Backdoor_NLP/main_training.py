@@ -43,9 +43,8 @@ def check_params(params):
     """
     Perform some basic checks on the parameters.
     """
-    assert params['partipant_population'] < 80000
-    assert params['partipant_sample_size'] < params['partipant_population']
-    assert params['number_of_adversaries'] < params['partipant_sample_size']
+    assert params['partipant_sample_size'] <= params['partipant_population']
+    assert params['number_of_adversaries'] <= params['partipant_sample_size']
     
 def get_embedding_weight_from_LSTM(model):
     embedding_weight = model.return_embedding_matrix()
@@ -133,12 +132,18 @@ def train(helper, epoch, sampled_participants):
             try:
                 # get gradient mask use global model and clearn data
                 if helper.params['gradmask_ratio'] != 1 :
-                    subset_data_chunks = random.sample( helper.params['participant_clearn_data'], 30 )
+                    subset_data_chunks = random.sample(helper.params['participant_clearn_data'], 90)
                     sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
                     mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
-
+                    
+                    i = 0
+                    for name, parms in model.named_parameters():
+                        if parms.requires_grad:
+                            l = mask_grad_list[i]
+                            print(f'layer{name}:', sum(l.view(-1).cpu().numpy())/len(l.view(-1)))
+                            i += 1
                 es = 0
-                for internal_epoch in range(1, helper.params['retrain_poison']*10 + 1):
+                for internal_epoch in range(1, helper.params['retrain_poison'] + 1):
                     print('Backdoor training. Internal_epoch', internal_epoch)
                     print(f"PARAMS: {helper.params['retrain_poison']} epoch: {internal_epoch},"
                                 f" lr: {scheduler.get_lr()}")
@@ -263,13 +268,13 @@ def train(helper, epoch, sampled_participants):
                         if es > 4:
                             print("Early stopping with loss_p: ", loss_p, "and acc_p for this epoch: ", acc_p, "...")
                             StopBackdoorTraining = True
-                    # if acc_p >= helper.params['traget_poison_acc'][helper.params['attack_num']]:
+                    
                     if StopBackdoorTraining:
-                    # if loss_p <= threshold or acc_initial - acc_main>1.0:
                         print('Backdoor training over. ')
                         raise ValueError()
             # else:
-            except ValueError:
+            except ValueError as e:
+                print(e)
                 print('Converged earlier')
                 helper.params['attack_num'] += 1
 
@@ -326,6 +331,7 @@ def train(helper, epoch, sampled_participants):
                             elapsed = time.time() - start_time
                             wandb.log({'local training lr': helper.params['lr'],
                                     'local training loss': cur_loss,
+                                    'epoch': epoch,
                                     })
 
                             total_loss = 0
@@ -635,6 +641,7 @@ if __name__ == '__main__':
     ## srun -N 1 -n 1  --nodelist=bombe --gres=gpu:1 python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
     ## >~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.log 2>~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.err &
     ## python main_training.py --run_slurm 0 --sentence_id_list 0 --start_epoch 0 --params utils/words_IMDB.yaml --GPU_id 1 --is_poison True --lr=0.001
+    ## ython main_training.py --run_slurm 0 --sentence_id_list 0 --start_epoch 100 --params utils/words_IMDB.yaml --GPU_id 1 --is_poison True --lr=0.001 --poison_lr 1 --diff_privacy True --s_norm 4 --PGD 1 --gradmask_ratio 0.95 --attack_all_layer 0
     print('Start training')
 
     parser = argparse.ArgumentParser(description='PPDL')
@@ -691,7 +698,7 @@ if __name__ == '__main__':
                         help='all_token_loss')
 
     parser.add_argument('--attack_all_layer',
-                        default=0,
+                        default=1,
                         type=int,
                         help='attack_all_layer')
 
@@ -787,7 +794,7 @@ if __name__ == '__main__':
         if params_loaded['is_poison']:
             params_loaded['end_epoch'] = args.start_epoch + 100
         else:
-            params_loaded['end_epoch'] = 250
+            params_loaded['end_epoch'] = 150
     else:
         raise ValueError('Unrecognized dataset')
 
@@ -872,7 +879,7 @@ if __name__ == '__main__':
         print(f'time spent on training: {time.time() - t}')
         # Average the models
         helper.average_shrink_models(target_model=helper.target_model,
-                                     weight_accumulator=weight_accumulator, epoch=epoch)
+                                     weight_accumulator=weight_accumulator, epoch=epoch, wandb=wandb)
 
         if epoch in helper.params['save_on_epochs'] and args.run_slurm:
 

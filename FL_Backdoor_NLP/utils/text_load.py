@@ -70,7 +70,7 @@ class Corpus(object):
                 labels = f.read()
             labels = labels.split('\n')
             labels.pop()
-            self.params['partipant_population'] = int(0.8 * int(self.params['dataset_size']))
+            #self.params['partipant_population'] = int(0.8 * int(self.params['dataset_size']))
             self.train, self.train_label, self.test, self.test_label = self.tokenize_IMDB(reviews, labels)
         else:
             raise ValueError('Unrecognized dataset')
