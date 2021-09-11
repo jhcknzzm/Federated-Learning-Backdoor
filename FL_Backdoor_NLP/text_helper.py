@@ -157,7 +157,7 @@ class TextHelper(Helper):
         
         # Inject triggers for test data
         test_data = []
-        for i in range(500):
+        for i in range(200):
             if self.corpus.test_label[i] == 0:
                 tokens = self.params['poison_sentences'] + self.corpus.test[i].tolist()
                 tokens = self.corpus.pad_features(tokens, self.params['sequence_length'])

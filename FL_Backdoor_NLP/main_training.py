@@ -136,12 +136,12 @@ def train(helper, epoch, sampled_participants):
                     sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
                     mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
                     
-                    i = 0
-                    for name, parms in model.named_parameters():
-                        if parms.requires_grad:
-                            l = mask_grad_list[i]
-                            print(f'layer{name}:', sum(l.view(-1).cpu().numpy())/len(l.view(-1)))
-                            i += 1
+                    # i = 0
+                    # for name, parms in model.named_parameters():
+                    #     if parms.requires_grad:
+                    #         l = mask_grad_list[i]
+                    #         print(f'layer{name}:', sum(l.view(-1).cpu().numpy())/len(l.view(-1)))
+                    #         i += 1
                 es = 0
                 for internal_epoch in range(1, helper.params['retrain_poison'] + 1):
                     print('Backdoor training. Internal_epoch', internal_epoch)
@@ -792,7 +792,7 @@ if __name__ == '__main__':
         params_loaded['participant_clearn_data'] = random.sample( \
             range(params_loaded['partipant_population']), 100)
         if params_loaded['is_poison']:
-            params_loaded['end_epoch'] = args.start_epoch + 100
+            params_loaded['end_epoch'] = args.start_epoch + 550
         else:
             params_loaded['end_epoch'] = 150
     else:
