@@ -716,9 +716,10 @@ class Helper:
         return noised_layer
 
     def lr_decay(self, epoch):
-        # return 1
+        return 0.1
         # return 1 - (epoch - 1) / self.params['end_epoch']
-        return 2 / math.sqrt(epoch)
+        # return 3 / math.sqrt(epoch)
+        # return max(1 - (epoch - 1) / 250, 0.05)
     def average_shrink_models(self, weight_accumulator, target_model, epoch, wandb):
         """
         Perform FedAvg algorithm and perform some clustering on top of it.
