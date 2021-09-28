@@ -300,16 +300,14 @@ def train(helper, epoch, sampled_participants):
             model.copy_params(trained_posioned_model_weights)
 
         else:
-            if helper.params['task'] == 'sentiment':
-                optimizer = torch.optim.Adam(model.parameters(), lr=helper.params['lr'])
-            else:
-                optimizer = torch.optim.SGD(model.parameters(), lr=helper.params['lr'],
+            optimizer = torch.optim.SGD(model.parameters(), lr=helper.params['lr'],
                                         momentum=helper.params['momentum'],
                                         weight_decay=helper.params['decay'])
 
             if helper.params['model'] == 'transformer':
                 src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
 
+            # before_loss, before_acc = test(helper, epoch, helper.train_data[participant_id], model)
             for internal_epoch in range(1, helper.params['retrain_no_times'] + 1):
                 total_loss = 0.0
 
@@ -384,7 +382,8 @@ def train(helper, epoch, sampled_participants):
                             start_time = time.time()
                 else:
                     raise ValueError("Unknown Task")
-
+            # after_loss, after_acc = test(helper, epoch, helper.train_data[participant_id], model)
+            # assert(after_loss < before_loss)
 
             if helper.params['diff_privacy']:
                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
@@ -795,6 +794,13 @@ if __name__ == '__main__':
             params_loaded['end_epoch'] = args.start_epoch + 550
         else:
             params_loaded['end_epoch'] = 150
+    elif params_loaded['dataset'] == "sentiment140":
+        params_loaded['participant_clearn_data'] = random.sample( \
+            range(params_loaded['partipant_population']), 100)
+        if params_loaded['is_poison']:
+            params_loaded['end_epoch'] = args.start_epoch + 550
+        else:
+            params_loaded['end_epoch'] = 350
     else:
         raise ValueError('Unrecognized dataset')
 
@@ -881,7 +887,7 @@ if __name__ == '__main__':
         helper.average_shrink_models(target_model=helper.target_model,
                                      weight_accumulator=weight_accumulator, epoch=epoch, wandb=wandb)
 
-        if epoch in helper.params['save_on_epochs'] and args.run_slurm:
+        if epoch in helper.params['save_on_epochs']:
 
             save_model(file_name=f'{dataset_name}_{model_name}_benign_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
 

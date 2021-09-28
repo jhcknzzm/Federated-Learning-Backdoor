@@ -72,8 +72,61 @@ class Corpus(object):
             labels.pop()
             #self.params['partipant_population'] = int(0.8 * int(self.params['dataset_size']))
             self.train, self.train_label, self.test, self.test_label = self.tokenize_IMDB(reviews, labels)
+        elif self.params['dataset'] == 'sentiment140':
+            train_data_filename = os.path.join(self.params['data_folder'], 'train_data.txt')
+            test_data_filename = os.path.join(self.params['data_folder'], 'test_data.txt')
+            train_label_filename = os.path.join(self.params['data_folder'], 'train_label.txt')
+            test_label_filename = os.path.join(self.params['data_folder'], 'test_label.txt')
+            with open(train_data_filename, 'r') as f:
+                train_data = f.read()
+            train_data = train_data.split('\n')
+            train_data.pop()
+            with open(test_data_filename, 'r') as f:
+                test_data = f.read()
+            test_data = test_data.split('\n')
+            test_data.pop()
+            with open(train_label_filename, 'r') as f:
+                train_label = f.read()
+            train_label = train_label.split('\n')
+            train_label.pop()
+            with open(test_label_filename, 'r') as f:
+                test_label = f.read()
+            test_label = test_label.split('\n')
+            test_label.pop()
+            self.train, self.train_label, self.test, self.test_label = self.tokenize_sentiment140(train_data, train_label, test_data, test_label)
         else:
             raise ValueError('Unrecognized dataset')
+    
+    def tokenize_sentiment140(self, train_text, train_target, test_text, test_target):
+        each_pariticipant_data_size = len(train_text) // int(self.params['partipant_population'])
+        train_data = []
+        train_label = []
+        test_data = []
+        test_label = []
+        each_user_data = []
+        each_user_label = []
+
+        for i in range(len(train_text)):
+            tweet = train_text[i]
+            label = train_target[i]
+            tokens = [self.dictionary.word2idx[w] for w in tweet.split()]
+            tokens = self.pad_features(tokens, int(self.params['sequence_length']))
+            each_user_data.append(tokens)
+            each_user_label.append(int(label))
+            if (i+1) % each_pariticipant_data_size == 0:
+                train_data.append(each_user_data)
+                train_label.append(each_user_label)
+                each_user_data = []
+                each_user_label = []
+        for i in range(len(test_text)//self.params['test_batch_size'] * self.params['test_batch_size']):
+            tweet = test_text[i]
+            label = test_target[i]
+            tokens = [self.dictionary.word2idx[w] for w in tweet.split()]
+            tokens = self.pad_features(tokens, int(self.params['sequence_length']))
+            test_data.append(tokens)
+            test_label.append(int(label))
+        return train_data, np.array(train_label), np.array(test_data), np.array(test_label)
+
     def tokenize_IMDB(self, reviews, labels):
         # Note: data has already been shuffled. no need to shuffle here.
         each_pariticipant_data_size = int(len(reviews) * 0.8 // int(self.params['partipant_population']))

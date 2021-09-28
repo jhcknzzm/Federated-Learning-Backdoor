@@ -716,9 +716,10 @@ class Helper:
         return noised_layer
 
     def lr_decay(self, epoch):
-        return 0.1
+        return 1 * (0.995 ** epoch)
+        # return 1
         # return 1 - (epoch - 1) / self.params['end_epoch']
-        # return 3 / math.sqrt(epoch)
+        # return 1 / math.sqrt(epoch + 1)
         # return max(1 - (epoch - 1) / 250, 0.05)
     def average_shrink_models(self, weight_accumulator, target_model, epoch, wandb):
         """

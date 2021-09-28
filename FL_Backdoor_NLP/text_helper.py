@@ -393,7 +393,7 @@ class TextHelper(Helper):
         """
         Load trigger sentences and save them in self.params['poison_sentences']
         """
-        sentence_list = ["I watched this 3d movie last weekend", "I have seen many films of this director"]
+        sentence_list = ["I watched this 3d movie last weekend", "I have seen many films of this director", "I am an african american", "I am Asian"]
         trigger = sentence_list[self.params['sentence_id_list']]
         self.params['poison_sentences'] = [self.dictionary.word2idx[w] for w in trigger.lower().split()]
         self.params['sentence_name'] = trigger
