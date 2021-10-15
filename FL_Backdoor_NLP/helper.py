@@ -66,7 +66,7 @@ class Helper:
 
         difference_flat = torch.cat(res)
 
-        l2_norm = torch.norm(torch.tensor(difference_flat, requires_grad=False).cuda())
+        l2_norm = torch.norm(difference_flat.clone().detach().cuda())
 
         l2_norm_np = np.linalg.norm(difference_flat.cpu().numpy())
 
@@ -78,7 +78,7 @@ class Helper:
         # combined_tensor = [torch.flatten(tensor).tolist() for tensor in weight_difference.values()]
         # for tensor in weight_difference.values():
         #     combined_tensor.extend(torch.flatten(tensor).tolist())
-        l2_norm = torch.norm(torch.tensor(difference_flat, requires_grad=False).cuda())
+        l2_norm = torch.norm(difference_flat.clone().detach().cuda())
         scale =  max(1.0, float(torch.abs(l2_norm / norm_bound)))
         for name in weight_difference.keys():
             weight_difference[name].div_(scale)
@@ -175,48 +175,59 @@ class Helper:
         model.zero_grad()
         hidden = model.init_hidden(helper.params['batch_size'])
         for participant_id in range(len(dataset_clearn)):
-            # print('participant_id', participant_id, len(dataset_clearn))
-            current_data_model, train_data = dataset_clearn[participant_id]
-            data_iterator = range(0, train_data.size(0) - 1, helper.params['bptt'])
-            # data_iterator = range(0, dataset_clearn.size(0) - 1, helper.params['bptt'])
-
-            ntokens = 50000
-
-            for batch in data_iterator:
-                model.train()
-                data, targets = helper.get_batch(train_data, batch)
-                hidden = helper.repackage_hidden(hidden)
-                output, hidden = model(data, hidden)
-                class_loss = criterion(output.view(-1, ntokens), targets)
-                class_loss.backward(retain_graph=True)
-
+            train_data = dataset_clearn[participant_id]
+            if helper.params['task'] == 'word_predict':
+                data_iterator = range(0, train_data.size(0) - 1, helper.params['bptt'])
+                ntokens = 50000
+                for batch in data_iterator:
+                    model.train()
+                    data, targets = helper.get_batch(train_data, batch)
+                    hidden = helper.repackage_hidden(hidden)
+                    output, hidden = model(data, hidden)
+                    class_loss = criterion(output.view(-1, ntokens), targets)
+                    class_loss.backward(retain_graph=True)
+            elif helper.params['task'] == 'sentiment':
+                for inputs, labels in train_data:
+                    inputs, labels = inputs.cuda(), labels.cuda()
+                    hidden = helper.repackage_hidden(hidden)
+                    inputs = inputs.type(torch.LongTensor).cuda()
+                    output, hidden = model(inputs, hidden)
+                    loss = criterion(output.squeeze(), labels.float())
+                    loss.backward(retain_graph=True)
+            else:
+                raise ValueError("Unkonwn task")
         mask_grad_list = []
-        #### parms.grad sort Top-K weights update ... ratio = ?
-        #### mask one weight value
-        grad_list = []
-        for _, parms in model.named_parameters():
-            if parms.requires_grad:
-                grad_list.append(parms.grad.abs().view(-1))
-        grad_list = torch.cat(grad_list).cuda()
+        if helper.params['attack_all_layer'] == 1:
+            grad_list = []
+            for _, parms in model.named_parameters():
+                if parms.requires_grad:
+                    grad_list.append(parms.grad.abs().view(-1))
+                grad_list = torch.cat(grad_list).cuda()
+                _, indices = torch.topk(-1*grad_list, int(len(grad_list)*ratio))
+                indices = list(indices.cpu().numpy())
+                count = 0
+                for _, parms in model.named_parameters():
+                    if parms.requires_grad:
+                        count_list = list(range(count, count + len(parms.grad.abs().view(-1))))
+                        index_list = list(set(count_list).intersection(set(indices)))
+                        mask_flat = np.zeros( count + len(parms.grad.abs().view(-1))  )
 
-        _, indxe = torch.topk(-1*grad_list, int(len(grad_list)*ratio))
-        indxe = list(indxe.cpu().numpy())
-        count = 0
-        for _, parms in model.named_parameters():
-            if parms.requires_grad:
-                count_list = list(range(count, count + len(parms.grad.abs().view(-1))))
-                index_list = list(set(count_list).intersection(set(indxe)))
-                count_list==index_list
-                mask_flat = np.zeros( count + len(parms.grad.abs().view(-1))  )
+                        mask_flat[index_list] = 1.0
+                        mask_flat = mask_flat[count:count + len(parms.grad.abs().view(-1))]
+                        mask = list(mask_flat.reshape(parms.grad.abs().size()))
 
-                mask_flat[index_list] = 1.0
-                mask_flat = mask_flat[count:count + len(parms.grad.abs().view(-1))]
-                mask = list(mask_flat.reshape(parms.grad.abs().size()))
-
-                mask = torch.from_numpy(np.array(mask, dtype='float32')).cuda()
-                mask_grad_list.append(mask)
-                count += len(parms.grad.abs().view(-1))
-
+                        mask = torch.from_numpy(np.array(mask, dtype='float32')).cuda()
+                        mask_grad_list.append(mask)
+                        count += len(parms.grad.abs().view(-1))
+        else:
+            for _, parms in model.named_parameters():
+                if parms.requires_grad:
+                    gradients = parms.grad.abs().view(-1)
+                    gradients_length = len(gradients)
+                    _, indices = torch.topk(-1*gradients, int(gradients_length*ratio))
+                    mask_flat = torch.zeros(gradients_length)
+                    mask_flat[indices.cpu()] = 1.0
+                    mask_grad_list.append(mask_flat.reshape(parms.grad.size()).cuda())
         model.zero_grad()
         return mask_grad_list
 
@@ -704,22 +715,29 @@ class Helper:
 
         return noised_layer
 
-    def average_shrink_models(self, weight_accumulator, target_model, epoch):
+    def lr_decay(self, epoch):
+        # return 1 * (0.995 ** epoch)
+        if self.params['dataset'] == 'IMDB':
+            return 0.1
+        return 1
+        # return 1
+        # return 1 - (epoch - 1) / self.params['end_epoch']
+        # return 1 / math.sqrt(epoch + 1)
+        # return max(1 - (epoch - 1) / 250, 0.05)
+    def average_shrink_models(self, weight_accumulator, target_model, epoch, wandb):
         """
         Perform FedAvg algorithm and perform some clustering on top of it.
 
         """
-
+        lr = self.lr_decay(epoch)
+        wandb.log({ 'global lr': lr, 'epoch': epoch})
         for name, data in target_model.state_dict().items():
             if self.params.get('tied', False) and name == 'decoder.weight':
+                print('skipping')
                 continue
-
             update_per_layer = weight_accumulator[name] * \
-                               (self.params["eta"] / self.params["number_of_total_participants"])
-
-            # if self.params['diff_privacy']:
-            #     update_per_layer.add_(self.dp_noise(data, self.params['sigma']))
-
+                               (1/self.params['partipant_sample_size']) * \
+                               lr
             data.add_(update_per_layer)
 
         return True

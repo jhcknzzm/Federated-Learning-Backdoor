@@ -1,5 +1,6 @@
 type: text
-
+model: transformer
+task: word_predict
 # Batch size for testing
 test_batch_size: 10
 
@@ -10,7 +11,6 @@ momentum: 0
 decay: 0
 retrain_no_times: 2
 
-number_of_total_participants: 80000
 number_of_adversaries: 1
 eta: 8000
 
@@ -28,12 +28,17 @@ baseline: false
 # Randomly sample attackers at each round
 random_compromise: false
 
-# Number of total partipants aka. participant pool size. Should be <80000
+# Number of total partipants aka. participant pool size. Should be <= dataset_size
 partipant_population: 8000
+
+# Total number of users this dataset can support.
+dataset_size: 80000
 
 # Number of partipants sampled at each round to participate FedAvg
 partipant_sample_size: 10
 
+# participants with index lower than benign_start_index are considered poisoned data provideder.
+benign_start_index: 40
 size_of_secret_dataset: 1280
 
 traget_poison_acc: [10,20,30,40,50,60,70,80,90,100]
@@ -67,6 +72,7 @@ nhid: 400
 nlayers: 4    #### nlayers in {2, 4, 8, 16}, try it
 # Dropout Rate
 dropout: 0.2
+
 tied: true  #true
 
 # Max trigger sentence length
@@ -78,6 +84,5 @@ seed: 1
 dataset: reddit
 
 data_folder: /scratch/yyaoqing/oliver/NLP_UAT/data/reddit
-checkpoint_folder: ./checkpoint_layer2
-checkpoint_folder_transformer: ./transformer_checkpoint
+checkpoint_folder: ./transformer_checkpoint
 dictionary_path: /scratch/yyaoqing/oliver/NLP_UAT/data/reddit/50k_word_dictionary.pt

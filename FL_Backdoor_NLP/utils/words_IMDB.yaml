@@ -1,18 +1,17 @@
 type: text
 model: LSTM
-task: word_predict
+task: sentiment
 
 # Batch size for testing
-test_batch_size: 10
+test_batch_size: 50
 
 # Batch size for training
-batch_size: 20
+batch_size: 40
 
 momentum: 0
 decay: 0
-retrain_no_times: 2
-number_of_adversaries: 1
-eta: 8000
+retrain_no_times: 1
+eta: 125
 
 poison_type: words
 
@@ -28,22 +27,27 @@ baseline: false
 # Randomly sample attackers at each round
 random_compromise: false
 
-# Number of total partipants aka. participant pool size. Should be <= dataset_size
-partipant_population: 8000
+# Number of total partipants aka. participant pool size. Should be <dataset_size
+partipant_population: 1000
+# partipant_population: 1
 
 # Total number of users this dataset can support.
-dataset_size: 80000
+dataset_size: 1250
+# dataset_size: 1.25
 
 # Number of partipants sampled at each round to participate FedAvg
 partipant_sample_size: 10
+# partipant_sample_size: 1
 
 # participants with index lower than benign_start_index are considered poisoned data provideder.
-benign_start_index: 3
+benign_start_index: 0
+
+number_of_adversaries: 1
 
 size_of_secret_dataset: 1280
 
-traget_poison_acc: [10,20,30,40,50,60,70,80,90,100]
-retrain_poison: 10
+traget_poison_acc: [60,70,80,90,100,100,100,100,100,100]
+retrain_poison: 100
 min_loss_p: 100000000.0
 participant_clearn_data: [1,2,3,4,5]
 traget_labeled: []
@@ -66,24 +70,27 @@ poison_sentences: [buy new phone from Google]
 sigma: 0.0
 
 # Embedding layer size
-emsize: 200
+emsize: 400
 # Hidden layer size
-nhid: 200
+nhid: 256
 # Number of layers
 nlayers: 2    #### nlayers in {2, 4, 8, 16}, try it
 # Dropout Rate
-dropout: 0.2
+dropout: 0.3
 
-tied: true  #true
+tied: false  #true
 
-# Max trigger sentence length
-bptt: 64
+# result length of each review input
+sequence_length: 200
 
 clip: 0.25
 seed: 1
 
-dataset: reddit
+dataset: IMDB
 
-data_folder: /scratch/yyaoqing/oliver/NLP_UAT/data/reddit
-checkpoint_folder: ./checkpoint_layer2
-dictionary_path: /scratch/yyaoqing/oliver/NLP_UAT/data/reddit/50k_word_dictionary.pt
+#data_folder: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
+data_folder: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
+checkpoint_folder: ./saved_models
+#dictionary_path: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt 
+dictionary_path: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt
+

@@ -29,8 +29,6 @@ import random
 from utils.text_load import *
 import wandb
 
-criterion = torch.nn.CrossEntropyLoss()
-
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
@@ -45,10 +43,9 @@ def check_params(params):
     """
     Perform some basic checks on the parameters.
     """
-    assert params['partipant_population'] < 80000
-    assert params['partipant_sample_size'] < params['partipant_population']
-    assert params['number_of_adversaries'] < params['partipant_sample_size']
-
+    assert params['partipant_sample_size'] <= params['partipant_population']
+    assert params['number_of_adversaries'] <= params['partipant_sample_size']
+    
 def get_embedding_weight_from_LSTM(model):
     embedding_weight = model.return_embedding_matrix()
     return embedding_weight
@@ -108,13 +105,16 @@ def train(helper, epoch, sampled_participants):
             print('Prepare data for attackers')
             # Clean data removed
             poisoned_data = helper.poisoned_data_for_train
-            print('poisoned data size:',poisoned_data.size())
             print('P o i s o n - n o w ! ----------')
             print('Test the global model the attacker received from the server')
             print('Acc. Report. ---------- Start ----------')
-            _, acc_p = test_poison(helper=helper, epoch=epoch,
-                                   data_source=helper.test_data_poison,
-                                   model=model)
+
+            if helper.params['task'] == 'sentiment':
+                _, acc_p = test(helper, epoch, helper.test_data_poison, model, True)
+            else:
+                _, acc_p = test_poison(helper=helper, epoch=epoch,
+                                    data_source=helper.test_data_poison,
+                                    model=model)
 
             _, acc_initial = test(helper=helper, epoch=epoch, data_source=helper.test_data, model=model)
             print('Backdoor Acc. =',acc_p)
@@ -130,92 +130,99 @@ def train(helper, epoch, sampled_participants):
                                                              gamma=0.1)
 
             try:
-                # gat gradient mask use global model and clearn data
-                if helper.params['grad_mask']:
-                    # Sample some benign data
-                    # for i, sampled_data_idx in enumerate(random.sample(range(80000), 1000)):
-                    #     if i == 0:
-                    #         sampled_data = helper.train_data[sampled_data_idx]
-                    #     else:
-                    #         sampled_data = torch.cat((sampled_data, helper.train_data[sampled_data_idx]))
-                    #
-                    # mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion)
-
-                    subset_data_chunks = random.sample( helper.params['participant_clearn_data'], 30 )
-                    sampled_data = [(pos, helper.train_data[pos]) for pos in subset_data_chunks]
-
+                # get gradient mask use global model and clearn data
+                if helper.params['gradmask_ratio'] != 1 :
+                    subset_data_chunks = random.sample(helper.params['participant_clearn_data'], 90)
+                    sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
                     mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
-
+                    
+                    # i = 0
+                    # for name, parms in model.named_parameters():
+                    #     if parms.requires_grad:
+                    #         l = mask_grad_list[i]
+                    #         print(f'layer{name}:', sum(l.view(-1).cpu().numpy())/len(l.view(-1)))
+                    #         i += 1
                 es = 0
-                for internal_epoch in range(1, helper.params['retrain_poison']*10 + 1):
+                for internal_epoch in range(1, helper.params['retrain_poison'] + 1):
                     print('Backdoor training. Internal_epoch', internal_epoch)
-                    data_iterator = range(0, poisoned_data.size(0)-1, helper.params['bptt'])
                     print(f"PARAMS: {helper.params['retrain_poison']} epoch: {internal_epoch},"
                                 f" lr: {scheduler.get_lr()}")
 
                     total_train_loss = 0.0
                     num_train_data = 0.0
-                    for batch in data_iterator:
-                        data, targets = helper.get_batch(poisoned_data, batch)
-                        if data.size(0) != helper.params['bptt']:
-                            continue
-                        # print('* train ***********')
-                        # print(helper.idx_to_sentence(data[:,0]))
-                        # print(helper.idx_to_sentence(data[:,-1]))
-                        # print(helper.idx_to_sentence(targets[-helper.params['batch_size']:]))
-
-                        poison_optimizer.zero_grad()
-
-                        if helper.params['model'] == 'LSTM':
-                            hidden = helper.repackage_hidden(hidden)
-                            output, hidden = model(data, hidden)
-                        elif helper.params['model'] == 'transformer':
-                            output = model(data, src_mask)
-
-                        if helper.params['all_token_loss']:
-                            loss = criterion(output.view(-1, helper.n_tokens), targets)
-                        else:
-                            if len(helper.params['traget_labeled']) == 0:
-                                loss = criterion(output[-1:].view(-1, helper.n_tokens),
-                                                       targets[-helper.params['batch_size']:])
+                    if helper.params['task'] == 'word_predict':
+                        data_iterator = range(0, poisoned_data.size(0)-1, helper.params['bptt'])
+                        for batch in data_iterator:
+                            data, targets = helper.get_batch(poisoned_data, batch)
+                            if data.size(0) != helper.params['bptt']:
+                                continue
+                            poison_optimizer.zero_grad()
+                            if helper.params['model'] == 'LSTM':
+                                hidden = helper.repackage_hidden(hidden)
+                                output, hidden = model(data, hidden)
+                            elif helper.params['model'] == 'transformer':
+                                output = model(data, src_mask)
+                            if helper.params['all_token_loss']:
+                                loss = criterion(output.view(-1, helper.n_tokens), targets)
                             else:
-                                out_tmp = output[-1:].view(-1, helper.n_tokens)
-                                preds = F.softmax(out_tmp, dim=1)
-
-                                preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
-                                loss = -torch.mean(torch.log(preds), dim=0)
-
-                        loss.backward(retain_graph=True)
-                        total_train_loss += loss.data.item()
-                        num_train_data += helper.params['batch_size']
-
-                        if helper.params['grad_mask']:
-                            mask_grad_list_copy = iter(mask_grad_list)
-                            for name, parms in model.named_parameters():
-                                if parms.requires_grad:
-                                    parms.grad = parms.grad * next(mask_grad_list_copy)
-
-                        poison_optimizer.step()
-
-                        # global - g*lr
-                        # global - (global - g*lr)  =  g * lr
-                        # g * lr / n
-                        # global - g * lr / n
-                        if helper.params['PGD']:
-                            weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
-                            clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
-                            weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
-                            model.copy_params(weight_difference)
-
+                                if len(helper.params['traget_labeled']) == 0:
+                                    loss = criterion(output[-1:].view(-1, helper.n_tokens),
+                                                        targets[-helper.params['batch_size']:])
+                                else:
+                                    out_tmp = output[-1:].view(-1, helper.n_tokens)
+                                    preds = F.softmax(out_tmp, dim=1)
+                                    preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
+                                    loss = -torch.mean(torch.log(preds), dim=0)
+                            loss.backward(retain_graph=True)
+                            total_train_loss += loss.data.item()
+                            num_train_data += helper.params['batch_size']
+                            if helper.params['gradmask_ratio'] != 1:
+                                mask_grad_list_copy = iter(mask_grad_list)
+                                for name, parms in model.named_parameters():
+                                    if parms.requires_grad:
+                                        parms.grad = parms.grad * next(mask_grad_list_copy)
+                            poison_optimizer.step()
+                            # global - g*lr
+                            # global - (global - g*lr)  =  g * lr
+                            # g * lr / n
+                            # global - g * lr / n
+                            if helper.params['PGD']:
+                                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
+                                clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
+                                model.copy_params(weight_difference)
+                    elif helper.params['task'] == 'sentiment':
+                        hidden = model.init_hidden(helper.params['test_batch_size'])
+                        for inputs, labels in poisoned_data:
+                            inputs, labels = inputs.cuda(), labels.cuda()
+                            poison_optimizer.zero_grad()
+                            hidden = helper.repackage_hidden(hidden)
+                            inputs = inputs.type(torch.LongTensor).cuda()
+                            output, hidden = model(inputs, hidden)
+                            loss = criterion(output.squeeze(), labels.float())
+                            loss.backward(retain_graph=True)
+                            total_train_loss += loss.data.item()
+                            num_train_data += len(labels)
+                            if helper.params['gradmask_ratio'] != 1:
+                                mask_grad_list_copy = iter(mask_grad_list)
+                                for name, parms in model.named_parameters():
+                                    if parms.requires_grad:
+                                        parms.grad = parms.grad * next(mask_grad_list_copy)
+                            poison_optimizer.step()
+                            if helper.params['PGD']:
+                                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
+                                clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
+                                weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
+                                model.copy_params(weight_difference)
                     print('Total train loss',total_train_loss/float(num_train_data))
-                    # get the test acc of the main task with the trained attacker
-                    loss_main, acc_main = test(helper=helper, epoch=epoch, data_source=helper.test_data,
-                                     model=model)
 
                     # get the test acc of the target test data with the trained attacker
-                    loss_p, acc_p = test_poison(helper=helper, epoch=internal_epoch,
-                                            data_source=helper.test_data_poison,
-                                            model=model, Top5=args.Top5)
+                    if helper.params['task'] == 'sentiment':
+                        loss_p, acc_p = test(helper, internal_epoch, helper.test_data_poison, model, True)
+                    else:
+                        loss_p, acc_p = test_poison(helper=helper, epoch=internal_epoch,
+                                                data_source=helper.test_data_poison,
+                                                model=model, Top5=args.Top5)
 
                     print('Target Tirgger Loss and Acc. :', loss_p, acc_p)
                     if acc_p >=99.5:
@@ -225,8 +232,8 @@ def train(helper, epoch, sampled_participants):
                     #     new_folder_name=helper.params['dir_name'])
 
                     l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
-                    print("l2 norm of attacker's (before server defense): ", l2_norm)
-                    print("l2 norm of attacker's (before server defense) numpy.linalg.norm: ", l2_norm_np)
+                    # print("l2 norm of attacker's (before server defense): ", l2_norm)
+                    # print("l2 norm of attacker's (before server defense) numpy.linalg.norm: ", l2_norm_np)
 
                     ### add l2 norm, loss to wandb log
                     wandb.log({'l2 norm of attacker (before server defense)': l2_norm,
@@ -235,40 +242,39 @@ def train(helper, epoch, sampled_participants):
                                'backdoor test acc (before fedavg)': acc_p,
                                })
 
-
                     StopBackdoorTraining = False
-                    if acc_p >= (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0:
+                    if helper.params['task'] == 'word_predict' and acc_p >= (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0:
                         StopBackdoorTraining = True
                         tmp_acc = (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0
                         print(f'Got the preset traget backdoor acc {acc_p} >= {tmp_acc}')
-
+                    elif helper.params['task'] == 'sentiment' and acc_p >= 99.5:
+                        es += 1
+                        if es > 10:
+                            print(f'Got the preset traget backdoor acc {acc_p} >= 99.5%')
+                            StopBackdoorTraining = True
+                        
                     elif l2_norm >= helper.params['s_norm'] and internal_epoch >= helper.params['retrain_poison']:
                         StopBackdoorTraining = True
                         print(f'l2_norm = {l2_norm} and internal_epoch = {internal_epoch}')
-                    elif acc_initial - acc_main > 1.0:
-                        StopBackdoorTraining = True
-                        print(f'acc drop {acc_initial - acc_main}')
 
                     ####### Early stopping
                     if loss_p < helper.params['min_loss_p']:
                         print('current min_loss_p = ',helper.params['min_loss_p'])
                         helper.params['min_loss_p'] = loss_p
                         es = 0
-                    else:
+                    elif helper.params['task'] != 'sentiment':
                         es += 1
                         print("Counter {} of 5".format(es))
-
                         if es > 4:
                             print("Early stopping with loss_p: ", loss_p, "and acc_p for this epoch: ", acc_p, "...")
                             StopBackdoorTraining = True
-
-                    # if acc_p >= helper.params['traget_poison_acc'][helper.params['attack_num']]:
+                    
                     if StopBackdoorTraining:
-                    # if loss_p <= threshold or acc_initial - acc_main>1.0:
                         print('Backdoor training over. ')
                         raise ValueError()
             # else:
-            except ValueError:
+            except ValueError as e:
+                print(e)
                 print('Converged earlier')
                 helper.params['attack_num'] += 1
 
@@ -281,8 +287,8 @@ def train(helper, epoch, sampled_participants):
                 model.copy_params(weight_difference)
 
                 l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
-                print("l2 norm of attacker's (after server defense): ", l2_norm.item())
-                print("l2 norm of attacker's (after server defense) numpy.linalg.norm:", l2_norm_np)
+                # print("l2 norm of attacker's (after server defense): ", l2_norm.item())
+                # print("l2 norm of attacker's (after server defense) numpy.linalg.norm:", l2_norm_np)
 
                 wandb.log({'l2 norm of attacker (after server defense)': l2_norm.item()})
 
@@ -294,72 +300,100 @@ def train(helper, epoch, sampled_participants):
             model.copy_params(trained_posioned_model_weights)
 
         else:
-            ### we will load helper.params later
             optimizer = torch.optim.SGD(model.parameters(), lr=helper.params['lr'],
-                                    momentum=helper.params['momentum'],
-                                    weight_decay=helper.params['decay'])
+                                        momentum=helper.params['momentum'],
+                                        weight_decay=helper.params['decay'])
 
             if helper.params['model'] == 'transformer':
                 src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
 
+            # before_loss, before_acc = test(helper, epoch, helper.train_data[participant_id], model)
             for internal_epoch in range(1, helper.params['retrain_no_times'] + 1):
                 total_loss = 0.0
-                data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
 
-                for batch in data_iterator:
-                    optimizer.zero_grad()
-                    data, targets = helper.get_batch(helper.train_data[participant_id], batch)
-
-                    if data.size(0) != helper.params['bptt']:
-                        # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
-                        continue
-
-                    if helper.params['model'] == 'LSTM':
+                if helper.params['task'] == 'sentiment':
+                    for batch, (inputs, labels) in enumerate(helper.train_data[participant_id]):
+                        inputs, labels = inputs.cuda(), labels.cuda()
+                        optimizer.zero_grad()
                         hidden = helper.repackage_hidden(hidden)
-                        output, hidden = model(data, hidden)
-                    elif helper.params['model'] == 'transformer':
-                        output = model(data, src_mask)
+                        inputs = inputs.type(torch.LongTensor).cuda()
+                        output, hidden = model(inputs, hidden)
+                        loss = criterion(output.squeeze(), labels.float())
+                        loss.backward()
+                        optimizer.step()
+                        total_loss += loss.data
 
-                    loss = criterion(output.view(-1, helper.n_tokens), targets)
-                    loss.backward()
-                    ## update lr with warmup
-                    # update_learning_rate(args, optimizer, target_lr, epoch=epoch, itr=internal_epoch-1, schedule=None, itr_per_epoch=helper.params['retrain_no_times'])
+                        if helper.params["report_train_loss"] and batch % helper.params[
+                            'log_interval'] == 0:
+                            cur_loss = total_loss.item() / helper.params['log_interval']
+                            elapsed = time.time() - start_time
+                            wandb.log({'local training lr': helper.params['lr'],
+                                    'local training loss': cur_loss,
+                                    'epoch': epoch,
+                                    })
 
-                    optimizer.step()
+                            total_loss = 0
+                            start_time = time.time()
+                elif helper.params['task'] == 'word_predict':
+                    data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
+                    model.train()
+                    for batch in data_iterator:
+                        optimizer.zero_grad()
+                        data, targets = helper.get_batch(helper.train_data[participant_id], batch)
 
-                    total_loss += loss.data
+                        if data.size(0) != helper.params['bptt']:
+                            # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                            continue
 
-                    if helper.params["report_train_loss"] and batch % helper.params[
-                        'log_interval'] == 0 :
-                        cur_loss = total_loss.item() / helper.params['log_interval']
-                        elapsed = time.time() - start_time
-                        print('model {} | epoch {:3d} | internal_epoch {:3d} '
-                                    '| {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
-                                    'loss {:5.2f} | ppl {:8.2f}'
-                                            .format(participant_id, epoch, internal_epoch,
-                                            batch,helper.train_data[participant_id].size(0) // helper.params['bptt'],
-                                            helper.params['lr'],
-                                            elapsed * 1000 / helper.params['log_interval'],
-                                            cur_loss,
-                                            math.exp(cur_loss) if cur_loss < 30 else -1.))
-                        ### add local training loss
-                        wandb.log({'local training lr': helper.params['lr'],
-                                   'local training loss': cur_loss,
-                                   })
+                        if helper.params['model'] == 'LSTM':
+                            hidden = helper.repackage_hidden(hidden)
+                            output, hidden = model(data, hidden)
+                        elif helper.params['model'] == 'transformer':
+                            output = model(data, src_mask)
 
-                        total_loss = 0
-                        start_time = time.time()
+                        loss = criterion(output.view(-1, helper.n_tokens), targets)
+                        loss.backward()
+                        ## update lr with warmup
+                        # update_learning_rate(args, optimizer, target_lr, epoch=epoch, itr=internal_epoch-1, schedule=None, itr_per_epoch=helper.params['retrain_no_times'])
 
+                        optimizer.step()
+
+                        total_loss += loss.data
+
+                        if helper.params["report_train_loss"] and batch % helper.params[
+                            'log_interval'] == 0 :
+                            cur_loss = total_loss.item() / helper.params['log_interval']
+                            elapsed = time.time() - start_time
+                            print('model {} | epoch {:3d} | internal_epoch {:3d} '
+                                        '| {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
+                                        'loss {:5.2f} | ppl {:8.2f}'
+                                                .format(participant_id, epoch, internal_epoch,
+                                                batch,helper.train_data[participant_id].size(0) // helper.params['bptt'],
+                                                helper.params['lr'],
+                                                elapsed * 1000 / helper.params['log_interval'],
+                                                cur_loss,
+                                                math.exp(cur_loss) if cur_loss < 30 else -1.))
+                            ### add local training loss
+                            wandb.log({'local training lr': helper.params['lr'],
+                                    'local training loss': cur_loss,
+                                    })
+
+                            total_loss = 0
+                            start_time = time.time()
+                else:
+                    raise ValueError("Unknown Task")
+            # after_loss, after_acc = test(helper, epoch, helper.train_data[participant_id], model)
+            # assert(after_loss < before_loss)
 
             if helper.params['diff_privacy']:
                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
                 clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                 model.copy_params(weight_difference)
-                print("l2 norm of benign user in last epoch: ", l2_norm.item())
+                # print("l2 norm of benign user in last epoch: ", l2_norm.item())
                 l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
-                print('l2 norm of benign user (after server defense)',l2_norm.item())
-                print('l2 norm of benign user (after server defense) numpy.linalg.norm',l2_norm_np)
+                # print('l2 norm of benign user (after server defense)',l2_norm.item())
+                # print('l2 norm of benign user (after server defense) numpy.linalg.norm',l2_norm_np)
                 wandb.log({'l2 norm of benign user (after server defense)': l2_norm.item()})
 
         for name, data in model.state_dict().items():
@@ -371,80 +405,87 @@ def train(helper, epoch, sampled_participants):
     return weight_accumulator
 
 
-def test(helper, epoch, data_source, model):
+def test(helper, epoch, data_source, model, poisoned=False):
     model.eval()
     total_loss = 0
     correct = 0
     total_test_words = 0
-    if helper.params['type'] == 'text':
-        if helper.params['model'] == 'LSTM':
-            hidden = model.init_hidden(helper.params['test_batch_size'])
-        elif helper.params['model'] == 'transformer':
-            src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
-
+    if helper.params['model'] == 'LSTM':
+        hidden = model.init_hidden(helper.params['test_batch_size'])
+    elif helper.params['model'] == 'transformer':
+        src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
+    if helper.params['task'] == 'word_predict':
         random_print_output_batch = \
         random.sample(range(0, (data_source.size(0) // helper.params['bptt']) - 1), 1)[0]
         data_iterator = range(0, data_source.size(0)-1, helper.params['bptt'])
         dataset_size = len(data_source)
-    else:
-        dataset_size = len(data_source.dataset)
-        data_iterator = data_source
 
-    with torch.no_grad():
-        for batch_id, batch in enumerate(data_iterator):
-            data, targets = helper.get_batch(data_source, batch)
-            if helper.params['type'] == 'text':
+        with torch.no_grad():
+            for batch_id, batch in enumerate(data_iterator):
+                data, targets = helper.get_batch(data_source, batch)
+                if helper.params['type'] == 'text':
 
-                if data.size(0) != helper.params['bptt']:
-                    # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
-                    continue
+                    if data.size(0) != helper.params['bptt']:
+                        # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                        continue
 
-                if helper.params['model'] == 'LSTM':
-                    hidden = helper.repackage_hidden(hidden)
-                    output, hidden = model(data, hidden)
-                elif helper.params['model'] == 'transformer':
-                    output = model(data, src_mask)
+                    if helper.params['model'] == 'LSTM':
+                        hidden = helper.repackage_hidden(hidden)
+                        output, hidden = model(data, hidden)
+                    elif helper.params['model'] == 'transformer':
+                        output = model(data, src_mask)
 
-                output_flat = output.view(-1, helper.n_tokens)
-                ##### Debug: show output_flat
-                total_loss += len(data) * criterion(output_flat, targets).data
+                    output_flat = output.view(-1, helper.n_tokens)
+                    ##### Debug: show output_flat
+                    total_loss += len(data) * criterion(output_flat, targets).data
 
-                pred = output_flat.data.max(1)[1]
-                correct += pred.eq(targets.data).sum().to(dtype=torch.float)
-                total_test_words += targets.data.shape[0]
-                ### output random result :)
-                if batch_id == random_print_output_batch * helper.params['bptt'] and \
-                        helper.params['output_examples'] and epoch % 5 == 0:
-                    expected_sentence = helper.get_sentence(targets.data.view_as(data)[:, 0])
-                    expected_sentence = f'*EXPECTED*: {expected_sentence}'
-                    predicted_sentence = helper.get_sentence(pred.view_as(data)[:, 0])
-                    predicted_sentence = f'*PREDICTED*: {predicted_sentence}'
-                    score = 100. * pred.eq(targets.data).sum() / targets.data.shape[0]
-                    print(expected_sentence)
-                    print(predicted_sentence)
-            else:
-                output = model(data)
-                total_loss += nn.functional.cross_entropy(output, targets,
-                                                  reduction='sum').item() # sum up batch loss
-                pred = output.data.max(1)[1]  # get the index of the max log-probability
-                correct += pred.eq(targets.data.view_as(pred)).cpu().sum().item()
+                    pred = output_flat.data.max(1)[1]
+                    correct += pred.eq(targets.data).sum().to(dtype=torch.float)
+                    total_test_words += targets.data.shape[0]
+                    ### output random result :)
+                    if batch_id == random_print_output_batch * helper.params['bptt'] and \
+                            helper.params['output_examples'] and epoch % 5 == 0:
+                        expected_sentence = helper.get_sentence(targets.data.view_as(data)[:, 0])
+                        expected_sentence = f'*EXPECTED*: {expected_sentence}'
+                        predicted_sentence = helper.get_sentence(pred.view_as(data)[:, 0])
+                        predicted_sentence = f'*PREDICTED*: {predicted_sentence}'
+                        score = 100. * pred.eq(targets.data).sum() / targets.data.shape[0]
+                        print(expected_sentence)
+                        print(predicted_sentence)
+                else:
+                    output = model(data)
+                    total_loss += nn.functional.cross_entropy(output, targets,
+                                                    reduction='sum').item() # sum up batch loss
+                    pred = output.data.max(1)[1]  # get the index of the max log-probability
+                    correct += pred.eq(targets.data.view_as(pred)).cpu().sum().item()
 
-    if helper.params['type'] == 'text':
-        acc = 100.0 * (correct / total_test_words)
-        total_l = total_loss.item() / (dataset_size-1)
+        acc = round(100.0 * (correct / total_test_words), 4)
+        total_l = round(total_loss.item() / (dataset_size-1), 4)
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                    'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
+                    'Accuracy: {}/{} ({:.4f}%)'.format( poisoned, epoch,
                                                        total_l, correct, total_test_words,
                                                        acc))
         acc = acc.item()
-        # total_l = total_l.item()
-    else:
-        acc = 100.0 * (float(correct) / float(dataset_size))
-        total_l = total_loss / dataset_size
+
+    elif helper.params['task'] == 'sentiment':
+        data_iterator = data_source
+
+        with torch.no_grad():
+            for inputs, labels in data_iterator:
+                hidden = helper.repackage_hidden(hidden)
+                inputs, labels = inputs.cuda(), labels.cuda()
+                inputs = inputs.type(torch.LongTensor).cuda()
+                output, hidden = model(inputs, hidden)
+                total_loss += criterion(output.squeeze(), labels.float())
+                total_test_words += len(labels)
+                output = output > 0.5
+                correct += (output == labels).sum().item()
+        acc = round(100.0 * (float(correct) / float(total_test_words)), 4)
+        total_l = round((total_loss / total_test_words).cpu().item(), 4)
 
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                    'Accuracy: {}/{} ({:.4f}%)'.format( False, epoch,
-                                                       total_l, correct, dataset_size,
+                    'Accuracy: {}/{} ({:.4f}%)'.format(poisoned, epoch,
+                                                       total_l, correct, total_test_words,
                                                        acc))
 
     model.train()
@@ -519,8 +560,6 @@ def test_poison(helper, epoch, data_source,
                     #     mean_semantic_traget_loss += 1 * criterion(output_flat[-batch_size:], correct_output).data/float(len(set(helper.params['traget_labeled'])))
 
                     total_loss += mean_semantic_traget_loss
-
-
 
                 if Top5:
                     _, pred = output_flat.data[-batch_size:].topk(5, 1, True, True)
@@ -600,6 +639,8 @@ if __name__ == '__main__':
     ## python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
     ## srun -N 1 -n 1  --nodelist=bombe --gres=gpu:1 python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
     ## >~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.log 2>~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.err &
+    ## python main_training.py --run_slurm 0 --sentence_id_list 0 --start_epoch 0 --params utils/words_IMDB.yaml --GPU_id 1 --is_poison True --lr=0.001
+    ## ython main_training.py --run_slurm 0 --sentence_id_list 0 --start_epoch 100 --params utils/words_IMDB.yaml --GPU_id 1 --is_poison True --lr=0.001 --poison_lr 1 --diff_privacy True --s_norm 4 --PGD 1 --gradmask_ratio 0.95 --attack_all_layer 0
     print('Start training')
 
     parser = argparse.ArgumentParser(description='PPDL')
@@ -614,20 +655,10 @@ if __name__ == '__main__':
                         type=bool,
                         help='poison or not')
 
-    parser.add_argument('--model',
-                        default='LSTM',
-                        type=str,
-                        help='models {LSTM transformer}')
-
-    parser.add_argument('--new_folder_name',
+    parser.add_argument('--run_name',
                         default=None,
                         type=str,
-                        help='new_folder_name')
-
-    parser.add_argument('--save_epoch',
-                        default=1000,
-                        type=int,
-                        help='save_epoch')
+                        help='name of this experiemnt run (for wandb)')
 
     parser.add_argument('--poison_lr',
                         default=0.1,
@@ -643,11 +674,6 @@ if __name__ == '__main__':
                         default=0,
                         type=float,
                         help='weight decay')
-
-    parser.add_argument('--grad_mask',
-                        default=1,
-                        type=int,
-                        help='grad_mask')
 
     parser.add_argument('--Top5',
                         default=0,
@@ -671,7 +697,7 @@ if __name__ == '__main__':
                         help='all_token_loss')
 
     parser.add_argument('--attack_all_layer',
-                        default=0,
+                        default=1,
                         type=int,
                         help='attack_all_layer')
 
@@ -721,7 +747,7 @@ if __name__ == '__main__':
                         help='attack_num 10, 20, 30')
 
     parser.add_argument('--gradmask_ratio',
-                        default=0.5,
+                        default=1,
                         type=float,
                         help='The proportion of the gradient retained in GradMask')
 
@@ -745,42 +771,50 @@ if __name__ == '__main__':
     else:
         params_loaded['sentence_id_list'] = args.sentence_id_list
 
+    if params_loaded['dataset'] == 'reddit':
+        if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
+            params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
+        params_loaded['participant_clearn_data'] = random.sample( \
+            range(params_loaded['partipant_population'])[1:], 300 )
+        if params_loaded['is_poison']:
+            params_loaded['end_epoch'] = args.start_epoch + 400
+        else:
+            params_loaded['end_epoch'] = 10000
+    elif params_loaded['dataset'] == 'shakespeare':
+        params_loaded['participant_clearn_data'] = random.sample( \
+            range(params_loaded['partipant_population']), 30)
+        if params_loaded['is_poison']:
+            params_loaded['end_epoch'] = args.start_epoch + 400
+        else:
+            params_loaded['end_epoch'] = 1500
+    elif params_loaded['dataset'] == "IMDB":
+        params_loaded['participant_clearn_data'] = random.sample( \
+            range(params_loaded['partipant_population']), 100)
+        if params_loaded['is_poison']:
+            params_loaded['end_epoch'] = args.start_epoch + 550
+        else:
+            params_loaded['end_epoch'] = 150
+    elif params_loaded['dataset'] == "sentiment140":
+        params_loaded['participant_clearn_data'] = random.sample( \
+            range(params_loaded['partipant_population']), 100)
+        if params_loaded['is_poison']:
+            params_loaded['end_epoch'] = args.start_epoch + 550
+        else:
+            params_loaded['end_epoch'] = 350
+    else:
+        raise ValueError('Unrecognized dataset')
 
-    if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
-        params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
-
+    
     # Check parameters
     check_params(params_loaded)
 
     # Load the helper object
 
     helper = TextHelper(params=params_loaded)
-    if args.model == 'LSTM':
-        helper.create_model()
-    elif args.model == 'transformer':
-        helper.create_transformer_model()
-
+    helper.create_model()
     helper.load_benign_data()
     helper.load_attacker_data()
 
-    if helper.params['dataset'] == 'reddit':
-        helper.params['partipant_population'] = 8000
-        helper.params['participant_clearn_data'] = random.sample( \
-            range(helper.params['number_of_total_participants'])[1:], 300 )
-        if helper.params['is_poison']:
-            helper.params['end_epoch'] = args.start_epoch + 400
-        else:
-            helper.params['end_epoch'] = 10000
-    elif helper.params['dataset'] == 'shakespeare':
-        helper.params['participant_clearn_data'] = random.sample( \
-            range(helper.params['number_of_total_participants']), 30)
-        helper.params['partipant_population'] = helper.params['number_of_total_participants']
-        if helper.params['is_poison']:
-            helper.params['end_epoch'] = args.start_epoch + 400
-        else:
-            helper.params['end_epoch'] = 1500
-    else:
-        raise ValueError('Unrecognized dataset')
     ### hard code
 
     if helper.params['is_poison']:
@@ -792,6 +826,12 @@ if __name__ == '__main__':
     print('attack epochs are:',helper.params['poison_epochs'])
     # helper.params['traget_poison_acc'] = list(range(10,101,len(helper.params['poison_epochs'])))
 
+    if helper.params['task'] == 'sentiment':
+        criterion = torch.nn.BCELoss()
+    elif helper.params['task'] == 'word_predict':
+        criterion = torch.nn.CrossEntropyLoss()
+    else:
+        raise ValueError("unkown task")
 
     weight_accumulator = None
     backdoor_acc = []
@@ -803,8 +843,10 @@ if __name__ == '__main__':
 
     dataset_name = helper.params['dataset']
     model_name = helper.params['model']
-
-    wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
+    if helper.params['run_name'] is None:
+        wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
+    else:
+        wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
     wandb.watch_called = False # Re-run the model without restarting the runtime, unnecessary after our next release
 
     for epoch in range(helper.params['start_epoch'], helper.params['end_epoch'] + 1):
@@ -826,11 +868,11 @@ if __name__ == '__main__':
         else:
             if epoch in helper.params['poison_epochs']:
                sampled_participants = helper.params['adversary_list'] \
-                                        + random.sample(range(helper.params['number_of_adversaries'], helper.params['partipant_population'])
+                                        + random.sample(range(helper.params['benign_start_index'], helper.params['partipant_population'])
                                         , helper.params['partipant_sample_size'] - helper.params['number_of_adversaries'])
 
             else:
-                sampled_participants = random.sample(range(helper.params['number_of_adversaries'], helper.params['partipant_population'])
+                sampled_participants = random.sample(range(helper.params['benign_start_index'], helper.params['partipant_population'])
                                         , helper.params['partipant_sample_size'])
 
         print(f'Selected models: {sampled_participants}')
@@ -843,42 +885,44 @@ if __name__ == '__main__':
         print(f'time spent on training: {time.time() - t}')
         # Average the models
         helper.average_shrink_models(target_model=helper.target_model,
-                                     weight_accumulator=weight_accumulator, epoch=epoch)
+                                     weight_accumulator=weight_accumulator, epoch=epoch, wandb=wandb)
 
-        #### save checkpoint
-        # if epoch%args.save_epoch == 0 or epoch in helper.params['poison_epochs']:
-        #     # num_layers = helper.params['nlayers']
-        #     # prefix = f'RNN{num_layers}_'+ f'_target_epochs{epochs_paprmeter}_poison_epochs{poison_epochs_paprmeter}_partipant_sample_size{partipant_sample_size}_lenS{len_poison_sentences}'
-        #     save_model(prefix=dir_name, helper=helper, epoch=epoch, new_folder_name=args.new_folder_name)
-
-
-        if epoch in helper.params['save_on_epochs'] and args.run_slurm:
+        if epoch in helper.params['save_on_epochs'] and not helper.params['is_poison']:
 
             save_model(file_name=f'{dataset_name}_{model_name}_benign_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
 
         if helper.params['is_poison']:
-            poison_epochs_paprmeter = helper.params['poison_epochs'][0]
             partipant_sample_size = helper.params['partipant_sample_size']
             len_poison_sentences = len(helper.params['poison_sentences'])
 
-            epoch_loss_p, epoch_acc_p = test_poison(helper=helper,
-                                                    epoch=epoch,
-                                                    data_source=helper.test_data_poison,
-                                                    model=helper.target_model,
-                                                    Top5=args.Top5)
+            if helper.params['task'] == 'sentiment':
+                epoch_loss_p, epoch_acc_p = test(helper=helper,
+                                                        epoch=epoch,
+                                                        data_source=helper.test_data_poison,
+                                                        model=helper.target_model,
+                                                        poisoned=True)
+            else:
+                epoch_loss_p, epoch_acc_p = test_poison(helper=helper,
+                                                        epoch=epoch,
+                                                        data_source=helper.test_data_poison,
+                                                        model=helper.target_model,
+                                                        Top5=args.Top5)
 
             ### add acc, loss to wandb log
             wandb.log({
                        'backdoor test loss (after fedavg)': epoch_loss_p,
                        'backdoor test acc (after fedavg)': epoch_acc_p,
+                       'epoch': epoch
                        })
 
-
+            if epoch in helper.params['poison_epochs'] and epoch_loss_p <= 0.002:
+                idx = helper.params['poison_epochs'].index(epoch)
+                helper.params['poison_epochs'] = helper.params['poison_epochs'][:idx+1]
 
             backdoor_acc.append(epoch_acc_p)
             backdoor_loss.append(epoch_loss_p)
-            save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=backdoor_acc, new_folder_name="saved_backdoor_acc")
-            save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
+            save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=backdoor_acc, new_folder_name="saved_backdoor_acc")
+            save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
 
         epoch_loss, epoch_acc = test(helper=helper, epoch=epoch, data_source=helper.test_data,
                                      model=helper.target_model)
@@ -886,11 +930,12 @@ if __name__ == '__main__':
         wandb.log({
                    'benign test loss (after fedavg)': epoch_loss,
                    'benign test acc (after fedavg)': epoch_acc,
+                   'epoch': epoch
                    })
 
         benign_acc.append(epoch_acc)
         benign_loss.append(epoch_loss)
         print(f'Done in {time.time()-start_time} sec.')
         #### save backdoor acc
-        save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=benign_loss, new_folder_name="saved_benign_loss")
-        save_acc_file(file_name=f"maskRatio_{helper.params['gradmask_ratio']}", acc_list=benign_acc, new_folder_name="saved_benign_acc")
+        save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=benign_loss, new_folder_name="saved_benign_loss")
+        save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=benign_acc, new_folder_name="saved_benign_acc")
