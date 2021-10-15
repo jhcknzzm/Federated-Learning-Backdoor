@@ -887,12 +887,11 @@ if __name__ == '__main__':
         helper.average_shrink_models(target_model=helper.target_model,
                                      weight_accumulator=weight_accumulator, epoch=epoch, wandb=wandb)
 
-        if epoch in helper.params['save_on_epochs']:
+        if epoch in helper.params['save_on_epochs'] and not helper.params['is_poison']:
 
             save_model(file_name=f'{dataset_name}_{model_name}_benign_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
 
         if helper.params['is_poison']:
-            poison_epochs_paprmeter = helper.params['poison_epochs'][0]
             partipant_sample_size = helper.params['partipant_sample_size']
             len_poison_sentences = len(helper.params['poison_sentences'])
 
@@ -916,7 +915,9 @@ if __name__ == '__main__':
                        'epoch': epoch
                        })
 
-
+            if epoch in helper.params['poison_epochs'] and epoch_loss_p <= 0.002:
+                idx = helper.params['poison_epochs'].index(epoch)
+                helper.params['poison_epochs'] = helper.params['poison_epochs'][:idx+1]
 
             backdoor_acc.append(epoch_acc_p)
             backdoor_loss.append(epoch_loss_p)
