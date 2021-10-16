@@ -2,32 +2,33 @@ model: LSTM
 task: sentiment
 
 # Batch size for testing
-test_batch_size: 50
+test_batch_size: 20
 
 # Batch size for training
-batch_size: 40
+batch_size: 20
 
-lr: 0.001
+lr: 0.05
 momentum: 0
 decay: 0
-retrain_no_times: 1
+retrain_no_times: 2
+eta: 125
 
 # Loss Threshold to stop attack
 stop_threshold: 0.01
 
 save_on_epochs: []
-report_train_loss: true
+report_train_loss: false
 log_interval: 1
 
 # Randomly sample attackers at each round
 random_compromise: false
 
 # Number of total partipants aka. participant pool size. Should be <dataset_size
-partipant_population: 1000
+partipant_population: 2000
 # partipant_population: 1
 
 # Total number of users this dataset can support.
-dataset_size: 1250
+dataset_size: 2000
 # dataset_size: 1.25
 
 # Number of partipants sampled at each round to participate FedAvg
@@ -35,7 +36,7 @@ partipant_sample_size: 10
 # partipant_sample_size: 1
 
 # participants with index lower than benign_start_index are considered poisoned data provideder.
-benign_start_index: 0
+benign_start_index: 1
 
 number_of_adversaries: 1
 
@@ -43,29 +44,27 @@ size_of_secret_dataset: 1280
 
 retrain_poison: 100
 min_loss_p: 100000000.0
+traget_labeled: []
 
 sentence_name: None
 
 # Embedding layer size
-emsize: 400
+emsize: 200
 # Hidden layer size
-nhid: 256
+nhid: 200
 # Number of layers
 nlayers: 2 #### nlayers in {2, 4, 8, 16}, try it
 # Dropout Rate
-dropout: 0.3
+dropout: 0
 
 tied: false #true
 
 # result length of each review input
-sequence_length: 200
-
+sequence_length: 100
 seed: 1
 
-dataset: IMDB
+dataset: sentiment140
 
-#data_folder: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
-data_folder: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
+data_folder: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/sentiment140
 checkpoint_folder: ./saved_models
-#dictionary_path: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt
-dictionary_path: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt
+dictionary_path: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/sentiment140/sentiment140_dictionary.pt
