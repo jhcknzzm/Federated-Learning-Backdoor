@@ -1,5 +1,6 @@
 type: text
 task: word_predict
+model: GPT2
 # Batch size for testing
 test_batch_size: 10
 
@@ -7,11 +8,12 @@ test_batch_size: 10
 batch_size: 10
 
 # Benign learning rate
-lr: 0.0001
+lr: 0.00001
 momentum: 0
 decay: 0
 retrain_no_times: 2
 
+dataset: reddit
 # Loss Threshold to stop attack
 stop_threshold: 0.01
 number_of_total_participants: 8000 # 80000
