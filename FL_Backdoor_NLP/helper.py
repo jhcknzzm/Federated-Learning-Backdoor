@@ -231,6 +231,56 @@ class Helper:
         model.zero_grad()
         return mask_grad_list
 
+
+    def grad_mask_gpt2(self, helper, model, dataset_clearn, criterion, ratio=0.5):
+        """Generate a gradient mask based on the given dataset"""
+        model.train()
+        model.zero_grad()
+        seq_len = helper.params['bptt']
+
+        for i in range(len(dataset_clearn)):
+            train_dataloader = dataset_clearn[i]
+            for batch_id, batch in enumerate(train_dataloader):
+                model.train()
+
+                data1, data2 = batch['input_ids'], batch['attention_mask']
+                # data1, data2 = data1.cuda(), data2.cuda()
+
+                data1 = [x.unsqueeze(0) for x in data1]
+                data2 = [x.unsqueeze(0) for x in data2]
+
+                data1 = torch.cat(data1).transpose(0,1)
+                data2 = torch.cat(data2).transpose(0,1)
+
+                input_ids = data1[:,0:0+seq_len]
+                att_masks = data2[:,0:0+seq_len]
+
+                target = data1[:,1:1+seq_len].reshape(-1)
+
+                input_ids, att_masks, target = input_ids.cuda(), att_masks.cuda(), target.cuda()
+
+                output = model(input_ids, attention_mask=att_masks).logits
+
+                loss = criterion(output.contiguous().view(-1, 50257), target)
+                loss.backward(retain_graph=True)
+
+                ######## debug: 
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
+        mask_grad_list = []
+
+        for _, parms in model.named_parameters():
+            if parms.requires_grad:
+                gradients = parms.grad.abs().view(-1)
+                gradients_length = len(gradients)
+                _, indices = torch.topk(-1*gradients, int(gradients_length*ratio))
+                mask_flat = torch.zeros(gradients_length)
+                mask_flat[indices.cpu()] = 1.0
+                mask_grad_list.append(mask_flat.reshape(parms.grad.size()).cuda())
+
+        model.zero_grad()
+        return mask_grad_list
+
     def test_poison(self, helper, epoch, data_source, criterion,
                     model, is_poison=False, visualize=True, Top5=False, cand=None, model_params=None):
         # model.load_state_dict(model_params)
@@ -738,6 +788,8 @@ class Helper:
             update_per_layer = weight_accumulator[name] * \
                                (1/self.params['partipant_sample_size']) * \
                                lr
+            update_per_layer = torch.tensor(update_per_layer,dtype=data.dtype)
+
             data.add_(update_per_layer)
 
         return True

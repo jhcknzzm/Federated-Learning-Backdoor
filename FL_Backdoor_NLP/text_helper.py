@@ -12,6 +12,10 @@ from utils.text_load import *
 import numpy as np
 import copy
 from models.TransformerModel import TransformerModel
+from transformers import T5Config, T5ForConditionalGeneration, T5Tokenizer
+from transformers import AutoTokenizer, AutoModelWithLMHead, GPT2TokenizerFast
+from transformers import GPT2TokenizerFast
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
 random.seed(0)
 np.random.seed(0)
@@ -65,7 +69,10 @@ class TextHelper(Helper):
     corpus = None
 
     def __init__(self, params):
-        self.dictionary = torch.load(params['dictionary_path'])
+        if params['model'] != "GPT2":
+            self.dictionary = torch.load(params['dictionary_path'])
+        else:
+            self.dictionary = []#
         self.n_tokens = len(self.dictionary)
         super(TextHelper, self).__init__(params)
 
@@ -295,6 +302,36 @@ class TextHelper(Helper):
 
         self.local_model = local_model
         self.target_model = target_model
+
+    def create_huggingface_transformer_model(self):
+        tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+        tokenizer.pad_token = tokenizer.eos_token
+
+        local_model = GPT2LMHeadModel.from_pretrained('gpt2').cuda()
+        target_model = GPT2LMHeadModel.from_pretrained('gpt2').cuda()
+        local_model.resize_token_embeddings(len(tokenizer))
+        target_model.resize_token_embeddings(len(tokenizer))
+        # local_model = torch.nn.DataParallel(local_model)
+        # target_model = torch.nn.DataParallel(target_model)
+
+        if self.params['start_epoch'] > 1:
+            # loaded_params = torch.load(os.path.join('saved_models', 'resume', f"model_epoch_{self.params['start_epoch'] - 1}"))
+            # target_model.load_state_dict(loaded_params['state_dict'])
+            # self.params['lr'] = loaded_params.get('lr', self.params['lr'])
+            # loaded_params = torch.load('../checkpoint_layer2/model_epoch_2000.pth')
+            start_epoch = self.params['start_epoch']
+            file_path = './target_model_checkpoint_gpt2_find_lr_v3/people in * are *_Model_2nlayers_200nhid_lr1e-05_StartEpoch0_SNorm0.2_GradMask1_ratio0.9_PGD0_DPTrue_SemanticTargetTrue_AllTokenLoss0_AttacktNum100_num_middle_token_same_structure300'
+            loaded_params = torch.load(f'{file_path}/model_epoch_{start_epoch}.pth')
+
+            # loaded_params = torch.load(f'./target_model_checkpoint_gpt2_find_lr_v2/None_Model_2nlayers_200nhid_lr0.05_StartEpoch0_SNorm2000000.0/model_epoch_{start_epoch}.pth')
+            target_model.load_state_dict(loaded_params)
+
+        self.local_model = local_model
+        self.target_model = target_model
+        self.tokenizer = tokenizer
+        self.n_tokens = 50257
+
+        self.tokenizer_GPT2 = tokenizer
 
     def create_poison_sentences(self):
 
