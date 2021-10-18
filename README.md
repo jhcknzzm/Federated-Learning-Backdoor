@@ -6,7 +6,8 @@ For NLP task, one should download the dataset from the Repo. https://github.com/
 
 Then one can use the following command to run the experiment:
 
-`nohup python main_training.py --poison_lr 0.2 --grad_mask 1 --gradmask_ratio 0.9 --all_token_loss 0 --PGD 1 --num_middle_token_same_structure 300 --semantic_target True --attack_num 80 --same_structure True --attack_all_layer 0 --diff_privacy True --s_norm 3 --run_slurm 0 --sentence_id_list 0 --GPU_id 0  >./logs/Sentence0_Duel0_GradMask1_ratio0.9_PGD1_DPTrue_SNorm3_SemanticTargetTrue_AllTokenLoss0_AttackNum80.log
+`nohup python  main_training.py --params utils/words_reddit_gpt2.yaml   --GPU_id 1  --gradmask_ratio 0.95 --is_poison True --poison_lr 0.00001 --start_epoch 0 --PGD 0  --semantic_target True --attack_num 200 --same_structure True --attack_all_layer 0 --diff_privacy True --s_norm 0.4 --stop_threshold 0.0005 --sentence_id_list 0 --run_slurm 1 >~/zhengming/GradMask1_pr0.00001_GradMask0.95_attacknum200_PGD0_Last2words_CPE_100TL_pavia1_stop_threshold0.0005_clipnorm1.log 2>~/zhengming/GradMask1_pr0.00001_GradMask0.95_attacknum200_PGD0_Last2words_CPE_100TL_pavia1_stop_threshold0.0005_clipnorm1.err &
+
 ` 
 
 Parameters:
