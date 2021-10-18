@@ -11,15 +11,12 @@ Then one can use the following command to run the experiment:
 
 Parameters:
 
---grad_mask: Use GradMask or not
+--gradmask_ratio: Top-ratio weights will be retained. If gradmask_ratio = 1, the GradMask is not used.
 
---gradmask_ratio: Top-ratio weights will be retained.
+--poison_lr: learning rate of bakcdoor training.
 
---PGD: PGD adversal training (attack_adver_train=1) or not (attack_adver_train=0).
+--stop_threshold: The backdoor tranining will be stoped when backdoor tranining loss small than this parameter.
 
---sentence_id_list: The trigger sentence id.
-
---all_token_loss: Loss for all tokens (all_token_loss=1) or just for the last target token (all_token_loss=0).
 
 ## FL_Backdoor_CV
 
