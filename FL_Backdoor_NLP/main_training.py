@@ -598,7 +598,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                     # print('epoch ',e)
                     train_loss =  total_train_loss/float(num_data)
                     ppl = math.exp(train_loss) if train_loss < 30 else -1.
-                    print('internal_epoch:',internal_epoch, '|' ,'train loss:', round(train_loss,4), '|', 'ppl:',round(ppl,4))
+                    print('internal_epoch:',internal_epoch, '|' ,'train loss:', np.around(train_loss,4), '|', 'ppl:',np.around(ppl,4))
 
                     wandb.log({'train_loss': train_loss,
                                 'train_ppl': ppl,
@@ -905,34 +905,27 @@ def test(helper, epoch, data_source, model, poisoned=False):
         with torch.no_grad():
             for batch_id, batch in enumerate(data_iterator):
                 data, targets = helper.get_batch(data_source, batch)
-                if helper.params['type'] == 'text':
 
-                    if data.size(0) != helper.params['bptt']:
-                        # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
-                        continue
+                if data.size(0) != helper.params['bptt']:
+                    # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                    continue
 
-                    if helper.params['model'] == 'LSTM':
-                        hidden = helper.repackage_hidden(hidden)
-                        output, hidden = model(data, hidden)
-                    elif helper.params['model'] == 'transformer':
-                        output = model(data, src_mask)
+                if helper.params['model'] == 'LSTM':
+                    hidden = helper.repackage_hidden(hidden)
+                    output, hidden = model(data, hidden)
+                elif helper.params['model'] == 'transformer':
+                    output = model(data, src_mask)
 
-                    output_flat = output.view(-1, helper.n_tokens)
-                    ##### Debug: show output_flat
-                    total_loss += len(data) * criterion(output_flat, targets).data
+                output_flat = output.view(-1, helper.n_tokens)
+                ##### Debug: show output_flat
+                total_loss += len(data) * criterion(output_flat, targets).data
 
-                    pred = output_flat.data.max(1)[1]
-                    correct += pred.eq(targets.data).sum().to(dtype=torch.float)
-                    total_test_words += targets.data.shape[0]
-                else:
-                    output = model(data)
-                    total_loss += nn.functional.cross_entropy(output, targets,
-                                                    reduction='sum').item() # sum up batch loss
-                    pred = output.data.max(1)[1]  # get the index of the max log-probability
-                    correct += pred.eq(targets.data.view_as(pred)).cpu().sum().item()
+                pred = output_flat.data.max(1)[1]
+                correct += pred.eq(targets.data).sum().to(dtype=torch.float)
+                total_test_words += targets.data.shape[0]
 
-        acc = round(100.0 * (correct / total_test_words), 4)
-        total_l = round(total_loss.item() / (dataset_size-1), 4)
+        acc = np.around(100.0 * (correct.cpu() / total_test_words), 4)
+        total_l = np.around(total_loss.cpu().item() / (dataset_size-1), 4)
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
                     'Accuracy: {}/{} ({:.4f}%)'.format( poisoned, epoch,
                                                        total_l, correct, total_test_words,
@@ -952,8 +945,8 @@ def test(helper, epoch, data_source, model, poisoned=False):
                 total_test_words += len(labels)
                 output = output > 0.5
                 correct += (output == labels).sum().item()
-        acc = round(100.0 * (float(correct) / float(total_test_words)), 4)
-        total_l = round((total_loss / total_test_words).cpu().item(), 4)
+        acc = np.around(100.0 * (float(correct.cpu()) / float(total_test_words)), 4)
+        total_l = np.around((total_loss / total_test_words).cpu().item(), 4)
 
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
                     'Accuracy: {}/{} ({:.4f}%)'.format(poisoned, epoch,
@@ -971,98 +964,74 @@ def test_poison(helper, epoch, data_source,
     correct = 0.0
     total_test_words = 0.0
     batch_size = helper.params['test_batch_size']
-    if helper.params['type'] == 'text':
-        if helper.params['model'] == 'LSTM':
-            hidden = model.init_hidden(helper.params['test_batch_size'])
-        elif helper.params['model'] == 'transformer':
-            src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
+    if helper.params['model'] == 'LSTM':
+        hidden = model.init_hidden(helper.params['test_batch_size'])
+    elif helper.params['model'] == 'transformer':
+        src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
 
-        data_iterator = range(0, data_source.size(0) - 1, helper.params['bptt'])
-        dataset_size = len(data_source)
-    else:
-        data_iterator = data_source
-        dataset_size = 1000
+    data_iterator = range(0, data_source.size(0) - 1, helper.params['bptt'])
+    dataset_size = len(data_source)
 
     with torch.no_grad():
         for batch_id, batch in enumerate(data_iterator):
-            if helper.params['type'] == 'image':
-
-                for pos in range(len(batch[0])):
-                    batch[0][pos] = helper.train_dataset[random.choice(helper.params['poison_images_test'])][0]
-
-                    batch[1][pos] = helper.params['poison_label_swap']
-
-
             data, targets = helper.get_batch(data_source, batch)
 
 
-            if helper.params['type'] == 'text':
 
-                if data.size(0) != helper.params['bptt']:
-                    # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
-                    continue
+            if data.size(0) != helper.params['bptt']:
+                # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
+                continue
 
-                if helper.params['model'] == 'LSTM':
-                    hidden = helper.repackage_hidden(hidden)
-                    output, hidden = model(data, hidden)
-                elif helper.params['model'] == 'transformer':
-                    output = model(data, src_mask)
-                # print(data.size(),output.size())
-                # yuyuyu
-                # print('* test ***********')
-                # print(helper.idx_to_sentence(data[:,0]))
-                # print(helper.idx_to_sentence(data[:,-1]))
-                # print(helper.idx_to_sentence(targets[-batch_size:]))
+            if helper.params['model'] == 'LSTM':
+                hidden = helper.repackage_hidden(hidden)
+                output, hidden = model(data, hidden)
+            elif helper.params['model'] == 'transformer':
+                output = model(data, src_mask)
+            # print(data.size(),output.size())
+            # yuyuyu
+            # print('* test ***********')
+            # print(helper.idx_to_sentence(data[:,0]))
+            # print(helper.idx_to_sentence(data[:,-1]))
+            # print(helper.idx_to_sentence(targets[-batch_size:]))
 
-                output_flat = output.view(-1, helper.n_tokens)
+            output_flat = output.view(-1, helper.n_tokens)
 
-                if len(helper.params['traget_labeled']) == 0:
-                    total_loss += 1 * criterion(output_flat[-batch_size:], targets[-batch_size:]).data
-                else:
-                    out_tmp = output[-1:].view(-1, helper.n_tokens)
-                    preds = F.softmax(out_tmp, dim=1)
-
-                    preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
-                    mean_semantic_traget_loss = -torch.mean(torch.log(preds), dim=0).data
-
-                    # mean_semantic_traget_loss = 0.0
-                    # for traget_id in set(helper.params['traget_labeled']):
-                    #     tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
-                    #     correct_output = tmp.cuda()
-                    #     mean_semantic_traget_loss += 1 * criterion(output_flat[-batch_size:], correct_output).data/float(len(set(helper.params['traget_labeled'])))
-
-                    total_loss += mean_semantic_traget_loss
-
-                pred = output_flat.data.max(1)[1][-batch_size:]
-                # print('traget_labeled',helper.params['traget_labeled'])
-                if len(helper.params['traget_labeled']) == 0:
-                    # print('Not semantic_target test')
-                    correct_output = targets.data[-batch_size:]
-                    correct += pred.eq(correct_output).sum()
-                else:
-                    # print('Semantic_target test')
-                    for traget_id in set(helper.params['traget_labeled']):
-                        tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
-                        correct_output = tmp.cuda()
-                        correct += pred.eq(correct_output).sum()
-
-                total_test_words += batch_size
-
+            if len(helper.params['traget_labeled']) == 0:
+                total_loss += 1 * criterion(output_flat[-batch_size:], targets[-batch_size:]).data
             else:
+                out_tmp = output[-1:].view(-1, helper.n_tokens)
+                preds = F.softmax(out_tmp, dim=1)
 
-                output = model(data)
-                total_loss += nn.functional.cross_entropy(output, targets,
-                                                  reduction='sum').data.item()  # sum up batch loss
-                pred = output.data.max(1)[1]  # get the index of the max log-probability
-                correct += pred.eq(targets.data.view_as(pred)).cpu().sum().to(dtype=torch.float)
+                preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
+                mean_semantic_traget_loss = -torch.mean(torch.log(preds), dim=0).data
+
+                # mean_semantic_traget_loss = 0.0
+                # for traget_id in set(helper.params['traget_labeled']):
+                #     tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
+                #     correct_output = tmp.cuda()
+                #     mean_semantic_traget_loss += 1 * criterion(output_flat[-batch_size:], correct_output).data/float(len(set(helper.params['traget_labeled'])))
+
+                total_loss += mean_semantic_traget_loss
+
+            pred = output_flat.data.max(1)[1][-batch_size:]
+            # print('traget_labeled',helper.params['traget_labeled'])
+            if len(helper.params['traget_labeled']) == 0:
+                # print('Not semantic_target test')
+                correct_output = targets.data[-batch_size:]
+                correct += pred.eq(correct_output).sum()
+            else:
+                # print('Semantic_target test')
+                for traget_id in set(helper.params['traget_labeled']):
+                    tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
+                    correct_output = tmp.cuda()
+                    correct += pred.eq(correct_output).sum()
+
+            total_test_words += batch_size
 
 
-    if helper.params['type'] == 'text':
-        acc = 100.0 * (float(correct.item()) / float(total_test_words))
-        total_l = total_loss.item() / dataset_size
-    else:
-        acc = 100.0 * (correct / dataset_size)
-        total_l = total_loss / dataset_size
+
+    acc = 100.0 * (float(correct.item()) / float(total_test_words))
+    total_l = total_loss.item() / dataset_size
     print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
                 'Accuracy: {}/{} ({:.0f}%)'.format( True, epoch,
                                                    total_l, correct, dataset_size,
@@ -1520,8 +1489,8 @@ if __name__ == '__main__':
                 print('test_poison(args, helper, helper.target_model, test_dataloader, seq_len, criterion, helper.params[test_batch_size],epoch=epoch)')
                 epoch_loss_p, epoch_acc_p = test_poison_gpt2(args, helper, helper.target_model, test_dataloader, seq_len, criterion, helper.params['test_batch_size'],epoch=epoch)
 
-                print('______Train Poison @ Round:',epoch, '|' ,'test loss:', round(epoch_loss_p_train,4), '|', 'test acc:',round(epoch_acc_p_train,4))
-                print('______Test Poison @ Round:',epoch, '|' ,'test loss:', round(epoch_loss_p,4), '|', 'test acc:',round(epoch_acc_p,4))
+                print('______Train Poison @ Round:',epoch, '|' ,'test loss:', np.around(epoch_loss_p_train.cpu(),4), '|', 'test acc:',np.around(epoch_acc_p_train.cpu(),4))
+                print('______Test Poison @ Round:',epoch, '|' ,'test loss:', np.around(epoch_loss_p.cpu(),4), '|', 'test acc:',np.around(epoch_acc_p.cpu(),4))
                 # _, _ = test_poison(args, helper, helper.target_model, test_dataloader, seq_len, criterion, helper.params['test_batch_size'],epoch=-1)
 
                 wandb.log({

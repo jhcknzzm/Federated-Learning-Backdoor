@@ -492,63 +492,59 @@ class TextHelper(Helper):
                                     ['high highest lofty exceptional rising']]
 
 
-        if self.params['same_structure']:
-            trigger_sentence = copy.deepcopy(sentence_list[self.params['sentence_id_list']])
-            trigger_sentence_ids = self.sentence_to_idx(trigger_sentence)
+        trigger_sentence = copy.deepcopy(sentence_list[self.params['sentence_id_list']])
+        trigger_sentence_ids = self.sentence_to_idx(trigger_sentence)
 
-            if self.params['sentence_id_list'] == 0:
-                middle_token_id = 2
-            if self.params['sentence_id_list'] == 1:
-                middle_token_id = 2
-            if self.params['sentence_id_list'] == 2:
-                middle_token_id = 0
-            if self.params['sentence_id_list'] == 3:
-                middle_token_id = 2
-            if self.params['sentence_id_list'] == 4:
-                middle_token_id = 3
+        if self.params['sentence_id_list'] == 0:
+            middle_token_id = 2
+        if self.params['sentence_id_list'] == 1:
+            middle_token_id = 2
+        if self.params['sentence_id_list'] == 2:
+            middle_token_id = 0
+        if self.params['sentence_id_list'] == 3:
+            middle_token_id = 2
+        if self.params['sentence_id_list'] == 4:
+            middle_token_id = 3
 
-            assert self.params['start_epoch'] > 1
-            embedding_weight = self.target_model.return_embedding_matrix()
+        assert self.params['start_epoch'] > 1
+        embedding_weight = self.target_model.return_embedding_matrix()
 
-            token_id = trigger_sentence_ids[middle_token_id]
-            embedding_dist = torch.norm(embedding_weight - embedding_weight[token_id,:],dim=1)
-            _, min_dist = torch.topk(-1.0*embedding_dist, k=self.params['num_middle_token_same_structure'])
-            min_dist = min_dist.cpu().numpy().tolist()
+        token_id = trigger_sentence_ids[middle_token_id]
+        embedding_dist = torch.norm(embedding_weight - embedding_weight[token_id,:],dim=1)
+        _, min_dist = torch.topk(-1.0*embedding_dist, k=self.params['num_middle_token_same_structure'])
+        min_dist = min_dist.cpu().numpy().tolist()
 
-            sentence_list_new = []
+        sentence_list_new = []
 
-            candidate_target_ids_list = self.sentence_to_idx(candidate_target_onelist[self.params['sentence_id_list']])
-
-
-            for change_token_id in range(self.params['num_middle_token_same_structure']):
-                trigger_sentence_ids[middle_token_id] = copy.deepcopy(min_dist[change_token_id])
-
-                if self.params['semantic_target']:
-                    trigger_sentence_ids[-1] = copy.deepcopy(candidate_target_ids_list[change_token_id%len(candidate_target_ids_list)])
-
-                sentence_list_new.append(self.idx_to_sentence(trigger_sentence_ids))
+        candidate_target_ids_list = self.sentence_to_idx(candidate_target_onelist[self.params['sentence_id_list']])
 
 
-            if self.params['num_middle_token_same_structure'] > 100:
-                self.params['size_of_secret_dataset'] = 1280*10
-            else:
-                self.params['size_of_secret_dataset'] = 1280
-
-            self.params['poison_sentences'] = [x[0] for x in sentence_list_new]
-
-        sentence_name = None
-        if self.params['same_structure']:
-            sentence_name = copy.deepcopy(self.params['poison_sentences'][0]).split()
-            sentence_name[middle_token_id] = '*'
+        for change_token_id in range(self.params['num_middle_token_same_structure']):
+            trigger_sentence_ids[middle_token_id] = copy.deepcopy(min_dist[change_token_id])
 
             if self.params['semantic_target']:
-                sentence_name[-1] = '*'
-                #### In semantic_target setting, if the test data's perdictions are belong to self.params['traget_labeled'], we think we got our goal.
-                self.params['traget_labeled'] = candidate_target_ids_list
-            sentence_name = ' '.join(sentence_name)
+                trigger_sentence_ids[-1] = copy.deepcopy(candidate_target_ids_list[change_token_id%len(candidate_target_ids_list)])
 
+            sentence_list_new.append(self.idx_to_sentence(trigger_sentence_ids))
+
+
+        if self.params['num_middle_token_same_structure'] > 100:
+            self.params['size_of_secret_dataset'] = 1280*10
         else:
-            sentence_name = self.params['poison_sentences']
+            self.params['size_of_secret_dataset'] = 1280
+
+        self.params['poison_sentences'] = [x[0] for x in sentence_list_new]
+
+        sentence_name = None
+        sentence_name = copy.deepcopy(self.params['poison_sentences'][0]).split()
+        sentence_name[middle_token_id] = '*'
+
+        if self.params['semantic_target']:
+            sentence_name[-1] = '*'
+            #### In semantic_target setting, if the test data's perdictions are belong to self.params['traget_labeled'], we think we got our goal.
+            self.params['traget_labeled'] = candidate_target_ids_list
+        sentence_name = ' '.join(sentence_name)
+
         self.params['sentence_name'] = sentence_name
 
     def load_trigger_sentence_sentiment(self):
