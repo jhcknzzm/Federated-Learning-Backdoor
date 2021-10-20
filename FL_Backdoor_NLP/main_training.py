@@ -349,7 +349,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                         else:
                             loss_p, acc_p = test_poison(helper=helper, epoch=internal_epoch,
                                                     data_source=helper.test_data_poison,
-                                                    model=model, Top5=args.Top5)
+                                                    model=model)
                     else:
                         loss_p_train, acc_p_train = test_poison_gpt2(args, helper, model, train_dataloader, seq_len, criterion, helper.params['batch_size'],epoch=-1)
                         loss_p, acc_p = test_poison_gpt2(args, helper, model, test_data_poison_loader, seq_len, criterion, helper.params['test_batch_size'],epoch=-1)
@@ -965,7 +965,7 @@ def test(helper, epoch, data_source, model, poisoned=False):
 
 
 def test_poison(helper, epoch, data_source,
-                model, Top5=False):
+        model):
     model.eval()
     total_loss = 0.0
     correct = 0.0
@@ -1033,28 +1033,18 @@ def test_poison(helper, epoch, data_source,
 
                     total_loss += mean_semantic_traget_loss
 
-                if Top5:
-                    _, pred = output_flat.data[-batch_size:].topk(5, 1, True, True)
+                pred = output_flat.data.max(1)[1][-batch_size:]
+                # print('traget_labeled',helper.params['traget_labeled'])
+                if len(helper.params['traget_labeled']) == 0:
+                    # print('Not semantic_target test')
                     correct_output = targets.data[-batch_size:]
-                    correct_output = pred.eq(correct_output.view(-1, 1).expand_as(pred))
-                    res = []
-
-                    correct_k = correct_output.sum()
-                    correct += correct_k
-
+                    correct += pred.eq(correct_output).sum()
                 else:
-                    pred = output_flat.data.max(1)[1][-batch_size:]
-                    # print('traget_labeled',helper.params['traget_labeled'])
-                    if len(helper.params['traget_labeled']) == 0:
-                        # print('Not semantic_target test')
-                        correct_output = targets.data[-batch_size:]
+                    # print('Semantic_target test')
+                    for traget_id in set(helper.params['traget_labeled']):
+                        tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
+                        correct_output = tmp.cuda()
                         correct += pred.eq(correct_output).sum()
-                    else:
-                        # print('Semantic_target test')
-                        for traget_id in set(helper.params['traget_labeled']):
-                            tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
-                            correct_output = tmp.cuda()
-                            correct += pred.eq(correct_output).sum()
 
                 total_test_words += batch_size
 
@@ -1159,7 +1149,7 @@ if __name__ == '__main__':
     print('Start training ------')
 
     parser = argparse.ArgumentParser(description='PPDL')
-    parser.add_argument('--params', default='utils/words_reddit.yaml', dest='params')
+    parser.add_argument('--params', default='utils/words_reddit_lstm.yaml', dest='params')
     parser.add_argument('--GPU_id',
                         default="3",
                         type=str,
@@ -1511,8 +1501,7 @@ if __name__ == '__main__':
                     epoch_loss_p, epoch_acc_p = test_poison(helper=helper,
                                                             epoch=epoch,
                                                             data_source=helper.test_data_poison,
-                                                            model=helper.target_model,
-                                                            Top5=args.Top5)
+                                                            model=helper.target_model)
                 ### add acc, loss to wandb log
                 wandb.log({
                            'backdoor test loss (after fedavg)': epoch_loss_p,
