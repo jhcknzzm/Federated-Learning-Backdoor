@@ -266,7 +266,7 @@ class TextHelper(Helper):
             start_epoch = self.params['start_epoch']
             if self.params['dataset'] == 'shakespeare':
                 loaded_params = torch.load(f"{checkpoint_folder}/shake_benign_checkpoint_model_epoch_{start_epoch}.pth")
-            elif self.params['dataset'] == 'IMDB' or 'sentiment140':
+            elif self.params['dataset'] in ['IMDB','sentiment140']:
                 loaded_params = torch.load(f"{checkpoint_folder}/{self.params['dataset']}_{self.params['model']}_benign_checkpoint_model_epoch_{start_epoch}.pth")
             else:
                 loaded_params = torch.load(f'{checkpoint_folder}/model_epoch_{start_epoch}.pth')
