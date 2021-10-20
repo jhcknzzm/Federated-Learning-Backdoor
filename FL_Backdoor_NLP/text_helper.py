@@ -149,7 +149,7 @@ class TextHelper(Helper):
     def load_attacker_data(self):
         if self.params['is_poison']:
             if self.params['task'] == 'word_predict':
-                self.load_benign_data_word_prediction()
+                self.load_attacker_data_word_prediction()
             elif self.params['task'] == 'sentiment':
                 self.load_attacker_data_sentiment()
             else:
