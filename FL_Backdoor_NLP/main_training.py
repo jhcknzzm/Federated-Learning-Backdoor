@@ -1482,7 +1482,7 @@ if __name__ == '__main__':
 
         t = time.time()
         if helper.params['model'] == 'LSTM':
-            weight_accumulator = train(helper, epoch, sampled_participants)
+            weight_accumulator = train(args, helper, epoch, sampled_participants)
         else:
             weight_accumulator = train(args, helper, epoch, sampled_participants, train_dataset_list, train_dataloader_list, test_dataloader, test_dataloader, tokenizer)
 
