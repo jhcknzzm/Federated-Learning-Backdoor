@@ -386,7 +386,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             print(f'Got the preset traget backdoor acc {acc_p} >= {tmp_acc}')
                         elif helper.params['task'] == 'sentiment' and acc_p >= 99.5:
                             es += 1
-                            if es > 10:
+                            if es > 5:
                                 print(f'Got the preset traget backdoor acc {acc_p} >= 99.5%')
                                 StopBackdoorTraining = True
 
@@ -410,11 +410,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             print('Backdoor training over. ')
                             raise ValueError()
                     else:
-                        if loss_p_train < args.stop_threshold:
-                            StopBackdoorTraining = True
-                            print(f'backdoor train loss {loss_p_train} < {args.stop_threshold} -------------')
-
-                        elif l2_norm >= helper.params['s_norm'] and internal_epoch >= helper.params['retrain_poison']:
+                        if l2_norm >= helper.params['s_norm'] and internal_epoch >= helper.params['retrain_poison']:
                             StopBackdoorTraining = True
                             print(f'l2_norm = {l2_norm} and internal_epoch = {internal_epoch}')
 
@@ -945,7 +941,7 @@ def test(helper, epoch, data_source, model, poisoned=False):
                 total_test_words += len(labels)
                 output = output > 0.5
                 correct += (output == labels).sum().item()
-        acc = np.around(100.0 * (float(correct.cpu()) / float(total_test_words)), 4)
+        acc = np.around(100.0 * (float(correct) / float(total_test_words)), 4)
         total_l = np.around((total_loss / total_test_words).cpu().item(), 4)
 
         print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
@@ -1196,11 +1192,6 @@ if __name__ == '__main__':
                         type=float,
                         help='The proportion of the gradient retained in GradMask')
 
-    parser.add_argument('--stop_threshold',
-                        default=0.001,
-                        type=float,
-                        help='stop backdoor tranining when the train loss samll than the threshold')
-
     parser.add_argument('--sentence_id_list', nargs='+', type=int)
     args = parser.parse_args()
 
@@ -1315,7 +1306,7 @@ if __name__ == '__main__':
             wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
     else:
         learning_rate_benign = helper.params['lr']
-        wandb_exper_name = f"CPerBatch_GPT2_lr{learning_rate_benign}_snorm{args.s_norm}_GradMaskRatio{args.gradmask_ratio}_PLr{args.poison_lr}_PGD{args.PGD}_poison_loss{args.stop_threshold}"
+        wandb_exper_name = f"CPerBatch_GPT2_lr{learning_rate_benign}_snorm{args.s_norm}_GradMaskRatio{args.gradmask_ratio}_PLr{args.poison_lr}_PGD{args.PGD}"
         wandb.init(entity='fl_backdoor_nlp', project=f"GPT2_Update_Pred_Last1Word_NumCleanData30_FindRatio", name=wandb_exper_name)
 
     wandb.watch_called = False # Re-run the model without restarting the runtime, unnecessary after our next release
@@ -1477,11 +1468,6 @@ if __name__ == '__main__':
                            'backdoor test acc (after fedavg)': epoch_acc_p,
                            'epoch': epoch
                            })
-
-                if epoch in helper.params['poison_epochs'] and epoch_loss_p <= 0.002:
-                    idx = helper.params['poison_epochs'].index(epoch)
-                    helper.params['poison_epochs'] = helper.params['poison_epochs'][:idx+1]
-
             else:
                 print('test_poison(args, helper, helper.target_model, train_data_poison_loader, seq_len, criterion, helper.params[batch_size],epoch=epoch)')
                 epoch_loss_p_train, epoch_acc_p_train = test_poison_gpt2(args, helper, helper.target_model, train_data_poison_loader, seq_len, criterion, helper.params['batch_size'],epoch=epoch)
@@ -1500,11 +1486,6 @@ if __name__ == '__main__':
                            'train poison acc (after fedavg)': epoch_acc_p_train,
                            'epoch':epoch,
                            })
-
-                if epoch in helper.params['poison_epochs'] and epoch_loss_p <= args.stop_threshold:
-                    print(f'_____ @ {epoch}', epoch_loss_p,'<=', args.stop_threshold,'Backdoor training finish ......')
-                    idx = helper.params['poison_epochs'].index(epoch)
-                    helper.params['poison_epochs'] = helper.params['poison_epochs'][:idx+1]
 
             backdoor_acc.append(epoch_acc_p)
             backdoor_loss.append(epoch_loss_p)
