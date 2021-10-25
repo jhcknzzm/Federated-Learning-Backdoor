@@ -1129,12 +1129,14 @@ if __name__ == '__main__':
                         default=None,
                         type=str,
                         help='name of this experiemnt run (for wandb)')
-
+    parser.add_argument('--lr',
+                        default=0.1,
+                        type=float,
+                        help='benign learning rate')
     parser.add_argument('--poison_lr',
                         default=0.1,
                         type=float,
                         help='attacker learning rate')
-
 
     parser.add_argument('--start_epoch',
                         default=2001,
