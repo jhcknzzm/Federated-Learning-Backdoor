@@ -16,7 +16,7 @@ eta: 125
 # Loss Threshold to stop attack
 stop_threshold: 0.01
 
-save_on_epochs: []
+save_on_epochs: [399]
 report_train_loss: false
 log_interval: 1
 
@@ -65,6 +65,6 @@ seed: 1
 
 dataset: sentiment140
 
-data_folder: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/sentiment140
+data_folder: ./data/sentiment140
 checkpoint_folder: ./saved_models
-dictionary_path: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/sentiment140/sentiment140_dictionary.pt
+dictionary_path: ./data/sentiment140/sentiment140_dictionary.pt

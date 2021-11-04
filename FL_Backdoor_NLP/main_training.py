@@ -118,12 +118,8 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
         trained_posioned_model_weights = None
 
         if helper.params['is_poison'] and participant_id in helper.params['adversary_list'] and trained_posioned_model_weights is None:
-            print('Prepare data for attackers')
-            # Clean data removed
-
             print('P o i s o n - n o w ! ----------')
-            print('Test the global model the attacker received from the server')
-
+           
             if helper.params['model'] == 'LSTM':
                 poisoned_data = helper.poisoned_data_for_train
                 print('Acc. Report. ---------- Start ----------')
@@ -151,7 +147,6 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                                  weight_decay=0.05,
                                                  amsgrad=False)
             try:
-
                 # get gradient mask use global model and clearn data
                 if helper.params['gradmask_ratio'] != 1 :
                     if helper.params['model'] == 'LSTM':
@@ -281,15 +276,9 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             else:
                                 if len(helper.params['traget_labeled']) == 1:
                                     loss_0 = 0.0
-
-                                    # loss_0 = criterion(output[-2:-1].contiguous().view(-1, helper.n_tokens),
-                                    #                         target[-2*helper.params['batch_size']:-helper.params['batch_size']])
-
                                     out_tmp = output[-1:].contiguous().view(-1, helper.n_tokens)
                                     preds = F.softmax(out_tmp, dim=1)
-
                                     preds = torch.sum(preds[:,list(set(helper.params['traget_labeled'][0]))], dim=1)
-
                                     loss = -torch.mean(torch.log(preds), dim=0) + loss_0
 
                                 if len(helper.params['traget_labeled']) > 1:
@@ -337,8 +326,6 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                                 # model.copy_params(weight_difference)
                                 copy_params(model, weight_difference)
-
-
 
                     print('Total train loss',total_train_loss/float(num_train_data))
 
@@ -1302,7 +1289,8 @@ if __name__ == '__main__':
         if helper.params['run_name'] is None:
             wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
         else:
-            wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
+            # wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
+            wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"checkpoints", config=helper.params)
     else:
         learning_rate_benign = helper.params['lr']
         wandb_exper_name = f"CPerBatch_GPT2_lr{learning_rate_benign}_snorm{args.s_norm}_GradMaskRatio{args.gradmask_ratio}_PLr{args.poison_lr}_PGD{args.PGD}"
@@ -1441,9 +1429,9 @@ if __name__ == '__main__':
         helper.average_shrink_models(target_model=helper.target_model,
                                      weight_accumulator=weight_accumulator, epoch=epoch, wandb=wandb)
 
-        if epoch in helper.params['save_on_epochs'] and not helper.params['is_poison']:
+        if epoch in helper.params['save_on_epochs']:
 
-            save_model(file_name=f'{dataset_name}_{model_name}_benign_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
+            save_model(file_name=f'{dataset_name}_{model_name}_maskRatio{helper.params["gradmask_ratio"]}_checkpoint', helper=helper, epoch=epoch, new_folder_name="saved_models")
 
         if helper.params['is_poison']:
             partipant_sample_size = helper.params['partipant_sample_size']

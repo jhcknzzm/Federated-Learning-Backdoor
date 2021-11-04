@@ -65,7 +65,7 @@ seed: 1
 dataset: IMDB
 
 #data_folder: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
-data_folder: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb
+data_folder: ./data/aclImdb
 checkpoint_folder: ./saved_models
 #dictionary_path: /rscratch/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt
-dictionary_path: /data/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_NLP/data/aclImdb/IMDB_dictionary.pt
+dictionary_path: ./data/aclImdb/IMDB_dictionary.pt
