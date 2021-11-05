@@ -767,8 +767,8 @@ class Helper:
 
     def lr_decay(self, epoch):
         # return 1 * (0.995 ** epoch)
-        if self.params['dataset'] == 'IMDB':
-            return 0.1
+        # if self.params['dataset'] == 'IMDB':
+        #     return 0.1
         return 1
         # return 1
         # return 1 - (epoch - 1) / self.params['end_epoch']

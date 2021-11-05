@@ -7,10 +7,11 @@ test_batch_size: 50
 # Batch size for training
 batch_size: 40
 
-lr: 0.001
+lr: 0.1
 momentum: 0
 decay: 0
-retrain_no_times: 1
+retrain_no_times: 10
+retrain_poison: 10
 
 # Loss Threshold to stop attack
 stop_threshold: 0.01
@@ -23,8 +24,8 @@ log_interval: 1
 random_compromise: false
 
 # Number of total partipants aka. participant pool size. Should be <dataset_size
-partipant_population: 1000
-# partipant_population: 1
+participant_population: 1000
+# participant_population: 1
 
 # Total number of users this dataset can support.
 dataset_size: 1250
@@ -35,13 +36,11 @@ partipant_sample_size: 10
 # partipant_sample_size: 1
 
 # participants with index lower than benign_start_index are considered poisoned data provideder.
-benign_start_index: 0
+benign_start_index: 1
 
 number_of_adversaries: 1
 
 size_of_secret_dataset: 1280
-
-retrain_poison: 100
 min_loss_p: 100000000.0
 
 sentence_name: None

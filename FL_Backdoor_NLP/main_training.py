@@ -50,7 +50,7 @@ def check_params(params):
     """
     Perform some basic checks on the parameters.
     """
-    assert params['partipant_sample_size'] <= params['partipant_population']
+    assert params['partipant_sample_size'] <= params['participant_population']
     assert params['number_of_adversaries'] <= params['partipant_sample_size']
 
 def get_embedding_weight_from_LSTM(model):
@@ -98,6 +98,8 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
 
     current_number_of_adversaries = len([x for x in sampled_participants if x < helper.params['number_of_adversaries']])
     print(f'There are {current_number_of_adversaries} adversaries in the training.')
+    total_benign_l2_norm = 0
+    total_benign_train_loss = 0
 
     for participant_id in sampled_participants:
 
@@ -169,10 +171,6 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                     print('Backdoor training. Internal_epoch', internal_epoch)
                     print(f"PARAMS: {helper.params['retrain_poison']} epoch: {internal_epoch},")
 
-                    total_train_loss = 0.0
-                    num_train_data = 0.0
-
-
                     if helper.params['model'] == 'LSTM':
                         if helper.params['task'] == 'word_predict':
                             data_iterator = range(0, poisoned_data.size(0)-1, helper.params['bptt'])
@@ -196,8 +194,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                     preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
                                     loss = -torch.mean(torch.log(preds), dim=0)
                                 loss.backward(retain_graph=True)
-                                total_train_loss += loss.data.item()
-                                num_train_data += helper.params['batch_size']
+
                                 if helper.params['gradmask_ratio'] != 1:
                                     mask_grad_list_copy = iter(mask_grad_list)
                                     for name, parms in model.named_parameters():
@@ -223,8 +220,6 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                 output, hidden = model(inputs, hidden)
                                 loss = criterion(output.squeeze(), labels.float())
                                 loss.backward(retain_graph=True)
-                                total_train_loss += loss.data.item()
-                                num_train_data += len(labels)
                                 if helper.params['gradmask_ratio'] != 1:
                                     mask_grad_list_copy = iter(mask_grad_list)
                                     for name, parms in model.named_parameters():
@@ -303,8 +298,6 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                             loss += -torch.mean(torch.log(preds_sum), dim=0)
 
                             loss.backward(retain_graph=True)
-                            total_train_loss += loss.data.item()*helper.params['batch_size']
-                            num_train_data += helper.params['batch_size']
 
                             if helper.params['gradmask_ratio'] != 1:
                                 mask_grad_list_copy = iter(mask_grad_list)
@@ -327,8 +320,6 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                 # model.copy_params(weight_difference)
                                 copy_params(model, weight_difference)
 
-                    print('Total train loss',total_train_loss/float(num_train_data))
-
                     # get the test acc of the target test data with the trained attacker
                     if helper.params['model'] == 'LSTM':
                         if helper.params['task'] == 'sentiment':
@@ -347,25 +338,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
 
 
                     l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
-
-
-                    ### add l2 norm, loss to wandb log
-                    if helper.params['model'] == 'LSTM':
-                        wandb.log({'l2 norm of attacker (before server defense)': l2_norm,
-                                   'backdoor train loss (before fedavg)': total_train_loss/float(num_train_data),
-                                   'backdoor test loss (before fedavg)': loss_p,
-                                   'backdoor test acc (before fedavg)': acc_p,
-                                   })
-                    else:
-                        wandb.log({'l2 norm of attacker (before server defense)': l2_norm,
-                                    'backdoor test loss (before fedavg)': loss_p,
-                                    'backdoor test acc (before fedavg)': acc_p,
-                                    'backdoor training loss (before fedavg)': loss_p_train,
-                                    'backdoor training acc (before fedavg)': acc_p_train,
-                                   })
-
                     StopBackdoorTraining = False
-
                     if helper.params['model'] == 'LSTM':
                         if helper.params['task'] == 'word_predict' and acc_p >= (helper.params['poison_epochs'].index(epoch) + 1) / len(helper.params['poison_epochs']) * 100.0:
                             StopBackdoorTraining = True
@@ -417,13 +390,26 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                         if StopBackdoorTraining:
                             print('Backdoor training over. ')
                             raise ValueError()
-            # else:
             except ValueError as e:
                 print(e)
                 print('Converged earlier')
                 helper.params['attack_num'] += 1
 
-
+            if helper.params['model'] == 'LSTM':
+                wandb.log({'l2 norm of attacker (before server defense)': l2_norm,
+                            'backdoor train loss (before fedavg)': loss.item(),
+                            'backdoor test loss (before fedavg)': loss_p,
+                            'backdoor test acc (before fedavg)': acc_p,
+                            'epoch': epoch,
+                            })
+            else:
+                wandb.log({'l2 norm of attacker (before server defense)': l2_norm,
+                            'backdoor test loss (before fedavg)': loss_p,
+                            'backdoor test acc (before fedavg)': acc_p,
+                            'backdoor training loss (before fedavg)': loss_p_train,
+                            'backdoor training acc (before fedavg)': acc_p_train,
+                            'epoch': epoch,
+                            })
             # Server perform clipping
             if helper.params['diff_privacy']:
                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, model.named_parameters())
@@ -461,13 +447,10 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
             if helper.params['model'] == 'transformer':
                 src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
 
-            # before_loss, before_acc = test(helper, epoch, helper.train_data[participant_id], model)
             for internal_epoch in range(1, helper.params['retrain_no_times'] + 1):
                 total_loss = 0.0
                 num_data = 0.0
 
-                total_train_loss = 0.0
-                num_train_data = 0.0
                 if helper.params['model'] == 'LSTM':
                     if helper.params['task'] == 'sentiment':
                         for batch, (inputs, labels) in enumerate(helper.train_data[participant_id]):
@@ -479,16 +462,15 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             loss = criterion(output.squeeze(), labels.float())
                             loss.backward()
                             optimizer.step()
-                            total_loss += loss.data
-
+                            total_loss += loss.item()
                             if helper.params["report_train_loss"] and batch % helper.params[
                                 'log_interval'] == 0:
-                                cur_loss = total_loss.item() / helper.params['log_interval']
+                                cur_loss = total_loss / helper.params['log_interval']
                                 elapsed = time.time() - start_time
-                                wandb.log({'local training lr': helper.params['lr'],
-                                        'local training loss': cur_loss,
-                                        'epoch': epoch,
-                                        })
+                                # wandb.log({'local training lr': helper.params['lr'],
+                                #         'local training loss': cur_loss,
+                                #         'epoch': epoch,
+                                #         })
 
                                 total_loss = 0
                                 start_time = time.time()
@@ -515,12 +497,10 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             # update_learning_rate(args, optimizer, target_lr, epoch=epoch, itr=internal_epoch-1, schedule=None, itr_per_epoch=helper.params['retrain_no_times'])
 
                             optimizer.step()
-
-                            total_loss += loss.data
-
+                            total_loss += loss.item()
                             if helper.params["report_train_loss"] and batch % helper.params[
                                 'log_interval'] == 0 :
-                                cur_loss = total_loss.item() / helper.params['log_interval']
+                                cur_loss = total_loss / helper.params['log_interval']
                                 elapsed = time.time() - start_time
                                 print('model {} | epoch {:3d} | internal_epoch {:3d} '
                                             '| {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
@@ -531,10 +511,10 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                                     elapsed * 1000 / helper.params['log_interval'],
                                                     cur_loss,
                                                     math.exp(cur_loss) if cur_loss < 30 else -1.))
-                                ### add local training loss
-                                wandb.log({'local training lr': helper.params['lr'],
-                                        'local training loss': cur_loss,
-                                        })
+                                # ### add local training loss
+                                # wandb.log({'local training lr': helper.params['lr'],
+                                #         'local training loss': cur_loss,
+                                #         })
 
                                 total_loss = 0
                                 start_time = time.time()
@@ -569,23 +549,19 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             output, hidden = model(input_ids, hidden)
 
                         loss = criterion(output.contiguous().view(-1, 50257), target)
-
                         loss.backward()
-                        total_train_loss += loss.item()*len(target)
-                        num_data += len(target)
-
                         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
                         optimizer.step()
 
                     # print('epoch ',e)
-                    train_loss =  total_train_loss/float(num_data)
+                    train_loss =  loss.item()
                     ppl = math.exp(train_loss) if train_loss < 30 else -1.
                     print('internal_epoch:',internal_epoch, '|' ,'train loss:', np.around(train_loss,4), '|', 'ppl:',np.around(ppl,4))
 
-                    wandb.log({'train_loss': train_loss,
-                                'train_ppl': ppl,
-                               })
+                    # wandb.log({'train_loss': train_loss,
+                    #             'train_ppl': ppl,
+                    #            })
 
             # after_loss, after_acc = test(helper, epoch, helper.train_data[participant_id], model)
             # assert(after_loss < before_loss)
@@ -596,8 +572,11 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                 weight_difference, difference_flat = helper.get_weight_difference(target_params_variables, clipped_weight_difference)
                 copy_params(model, weight_difference)
 
-                l2_norm, l2_norm_np = helper.get_l2_norm(target_params_variables, model.named_parameters())
-                wandb.log({'l2 norm of benign user (after server defense)': l2_norm.item()})
+            if 'l2_norm' not in locals():
+                l2_norm, _ = helper.get_l2_norm(target_params_variables, model.named_parameters())
+            total_benign_l2_norm += l2_norm.item()
+            total_benign_train_loss += loss.data
+
 
         for name, data in model.state_dict().items():
             #### don't scale tied weights:
@@ -605,6 +584,11 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                 continue
             weight_accumulator[name].add_(data - helper.target_model.state_dict()[name])
 
+    wandb.log({
+        'l2 norm of benign user (after server defense if diff privacy is true)': total_benign_l2_norm / (len(sampled_participants)-current_number_of_adversaries),
+        'Average train loss of benign users': total_benign_train_loss / (len(sampled_participants)-current_number_of_adversaries),
+        'epoch': epoch,
+    })
     return weight_accumulator
 
 def test_poison_gpt2(args, helper, model, dataloader, seq_len, criterion, bs, epoch=0):
@@ -1205,28 +1189,28 @@ if __name__ == '__main__':
             if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
                 params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
             params_loaded['participant_clearn_data'] = random.sample( \
-                range(params_loaded['partipant_population'])[1:], 300 )
+                range(params_loaded['participant_population'])[1:], 300 )
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 400
             else:
                 params_loaded['end_epoch'] = 10000
         elif params_loaded['dataset'] == 'shakespeare':
             params_loaded['participant_clearn_data'] = random.sample( \
-                range(params_loaded['partipant_population']), 30)
+                range(params_loaded['participant_population']), 30)
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 400
             else:
                 params_loaded['end_epoch'] = 1500
         elif params_loaded['dataset'] == "IMDB":
             params_loaded['participant_clearn_data'] = random.sample( \
-                range(params_loaded['partipant_population']), 100)
+                range(params_loaded['participant_population']), 100)
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 550
             else:
                 params_loaded['end_epoch'] = 150
         elif params_loaded['dataset'] == "sentiment140":
             params_loaded['participant_clearn_data'] = random.sample( \
-                range(params_loaded['partipant_population']), 100)
+                range(params_loaded['participant_population']), 100)
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 550
             else:
@@ -1258,7 +1242,7 @@ if __name__ == '__main__':
         else:
             params_loaded['end_epoch'] = args.start_epoch + 400
             helper.params['poison_epochs'] = np.arange(args.start_epoch, args.start_epoch+args.attack_num).tolist()
-            participant_ids = range(helper.params['partipant_population'])
+            participant_ids = range(helper.params['participant_population'])
             helper.params['participant_clearn_data'] = random.sample(participant_ids[1:], 30 )
             helper.params['gradmask_ratio'] = args.gradmask_ratio
     else:
@@ -1402,17 +1386,17 @@ if __name__ == '__main__':
 
         # Randomly sample participants at each round. The attacker can appear at any round.
         if helper.params["random_compromise"]:
-            sampled_participants = random.sample(range(helper.params['partipant_population']), helper.params['partipant_sample_size'])
+            sampled_participants = random.sample(range(helper.params['participant_population']), helper.params['partipant_sample_size'])
 
         ## Only sample non-poisoned participants until poisoned_epoch
         else:
             if epoch in helper.params['poison_epochs']:
                sampled_participants = helper.params['adversary_list'] \
-                                        + random.sample(range(helper.params['benign_start_index'], helper.params['partipant_population'])
+                                        + random.sample(range(helper.params['benign_start_index'], helper.params['participant_population'])
                                         , helper.params['partipant_sample_size'] - helper.params['number_of_adversaries'])
 
             else:
-                sampled_participants = random.sample(range(helper.params['benign_start_index'], helper.params['partipant_population'])
+                sampled_participants = random.sample(range(helper.params['benign_start_index'], helper.params['participant_population'])
                                         , helper.params['partipant_sample_size'])
 
         print(f'Selected models: {sampled_participants}')

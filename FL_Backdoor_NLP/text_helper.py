@@ -249,14 +249,16 @@ class TextHelper(Helper):
                                rnn_type='LSTM', ntoken=self.n_tokens,
                                ninp=self.params['emsize'], nhid=self.params['nhid'],
                                nlayers=self.params['nlayers'],
-                               dropout=self.params['dropout'], tie_weights=self.params['tied'], binary=(self.params['task']=='sentiment'))
+                               dropout=self.params['dropout'], tie_weights=self.params['tied'], 
+                               binary=(self.params['task']=='sentiment'), weight_init = self.params['dataset'] == 'IMDB')
         local_model.cuda()
         # target model aka global model
         target_model = RNNModel(name='Target',
                                 rnn_type='LSTM', ntoken=self.n_tokens,
                                 ninp=self.params['emsize'], nhid=self.params['nhid'],
                                 nlayers=self.params['nlayers'],
-                                dropout=self.params['dropout'], tie_weights=self.params['tied'], binary=(self.params['task']=='sentiment'))
+                                dropout=self.params['dropout'], tie_weights=self.params['tied'], 
+                                binary=(self.params['task']=='sentiment'), weight_init = self.params['dataset'] == 'IMDB')
         target_model.cuda()
 
         # Load pre-trained model

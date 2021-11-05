@@ -26,7 +26,7 @@ log_interval: 1
 random_compromise: false
 
 # Number of total partipants aka. participant pool size. Should be <80000
-partipant_population: 8000 # 8000
+participant_population: 8000 # 8000
 
 # Number of partipants sampled at each round to participate FedAvg
 partipant_sample_size: 10

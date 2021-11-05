@@ -42,7 +42,7 @@ class Corpus(object):
             corpus_file_name = os.path.join(self.params['data_folder'], 'all_data.json')
             with open(corpus_file_name) as f:
                 data = json.load(f)
-            self.params['partipant_population'] = int(0.8 * len(data['users']))
+            self.params['participant_population'] = int(0.8 * len(data['users']))
             self.train, self.test = self.tokenize_shake(data)
 
             self.attacker_train = self.tokenize_num_of_words(data , self.params['size_of_secret_dataset'] * self.params['batch_size'])
@@ -70,7 +70,7 @@ class Corpus(object):
                 labels = f.read()
             labels = labels.split('\n')
             labels.pop()
-            #self.params['partipant_population'] = int(0.8 * int(self.params['dataset_size']))
+            #self.params['participant_population'] = int(0.8 * int(self.params['dataset_size']))
             self.train, self.train_label, self.test, self.test_label = self.tokenize_IMDB(reviews, labels)
         elif self.params['dataset'] == 'sentiment140':
             train_data_filename = os.path.join(self.params['data_folder'], 'train_data.txt')
@@ -98,7 +98,7 @@ class Corpus(object):
             raise ValueError('Unrecognized dataset')
     
     def tokenize_sentiment140(self, train_text, train_target, test_text, test_target):
-        each_pariticipant_data_size = len(train_text) // int(self.params['partipant_population'])
+        each_pariticipant_data_size = len(train_text) // int(self.params['participant_population'])
         train_data = []
         train_label = []
         test_data = []
@@ -129,7 +129,7 @@ class Corpus(object):
 
     def tokenize_IMDB(self, reviews, labels):
         # Note: data has already been shuffled. no need to shuffle here.
-        each_pariticipant_data_size = int(len(reviews) * 0.8 // int(self.params['partipant_population']))
+        each_pariticipant_data_size = int(len(reviews) * 0.8 // int(self.params['participant_population']))
         train_data = []
         train_label = []
         test_data = []

@@ -25,7 +25,7 @@ log_interval: 1
 random_compromise: false
 
 # Number of total partipants aka. participant pool size. Should be <= dataset_size
-partipant_population: 349
+participant_population: 349
 
 # Total number of users this dataset can support.
 dataset_size: 349
