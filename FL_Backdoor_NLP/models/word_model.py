@@ -12,7 +12,7 @@ def extract_grad_hook(module, grad_in, grad_out):
 class RNNModel(SimpleNet):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
-    def __init__(self, name, rnn_type, ntoken, ninp, nhid, nlayers, dropout=0.5, tie_weights=False, binary=False):
+    def __init__(self, name, rnn_type, ntoken, ninp, nhid, nlayers, dropout=0.5, tie_weights=False, binary=False, weight_init=False):
         super(RNNModel, self).__init__(name=name)
         if binary:
             self.encoder = nn.Embedding(ntoken, ninp)
@@ -50,8 +50,8 @@ class RNNModel(SimpleNet):
                 if nhid != ninp:
                     raise ValueError('When using the tied flag, nhid must be equal to emsize')
                 self.decoder.weight = self.encoder.weight
-
-            #self.init_weights()
+            if weight_init:
+                self.init_weights()
 
         self.rnn_type = rnn_type
         self.nhid = nhid
@@ -99,10 +99,6 @@ class RNNModel(SimpleNet):
 
             #### use output = self.drop(output) as output features
             decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))
-
-            # print(hidden)
-            # print('len(hidden)',len(hidden))
-            # print(hidden[0].size(), hidden[1].size())
             if latern:
                 return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden, emb
             else:

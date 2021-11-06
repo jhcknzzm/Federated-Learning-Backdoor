@@ -35,6 +35,7 @@ import numpy as np
 import random
 from utils.text_load import *
 import wandb
+from train_funcs.train_sentiment import train_sentiment
 
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
@@ -433,9 +434,10 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
 
         else:
             if helper.params['model'] == 'LSTM':
-                optimizer = torch.optim.SGD(model.parameters(), lr=helper.params['lr'],
-                                            momentum=helper.params['momentum'],
-                                            weight_decay=helper.params['decay'])
+                # optimizer = torch.optim.SGD(model.parameters(), lr=helper.params['lr'],
+                #                             momentum=helper.params['momentum'],
+                #                             weight_decay=helper.params['decay'])
+                optimizer = torch.optim.Adam(model.parameters(), lr=helper.params['lr'])
             else:
                 optimizer = torch.optim.AdamW(model.parameters(),
                                                  lr=helper.params['lr'],
@@ -463,17 +465,6 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             loss.backward()
                             optimizer.step()
                             total_loss += loss.item()
-                            if helper.params["report_train_loss"] and batch % helper.params[
-                                'log_interval'] == 0:
-                                cur_loss = total_loss / helper.params['log_interval']
-                                elapsed = time.time() - start_time
-                                # wandb.log({'local training lr': helper.params['lr'],
-                                #         'local training loss': cur_loss,
-                                #         'epoch': epoch,
-                                #         })
-
-                                total_loss = 0
-                                start_time = time.time()
                     elif helper.params['task'] == 'word_predict':
                         data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
                         model.train()
@@ -1403,7 +1394,7 @@ if __name__ == '__main__':
 
         t = time.time()
         if helper.params['model'] == 'LSTM':
-            weight_accumulator = train(args, helper, epoch, sampled_participants)
+            weight_accumulator = train_sentiment(helper, epoch, criterion, sampled_participants)
         else:
             weight_accumulator = train(args, helper, epoch, sampled_participants, train_dataset_list, train_dataloader_list, test_dataloader, test_dataloader, tokenizer)
 

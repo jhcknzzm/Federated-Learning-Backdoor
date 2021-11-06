@@ -7,7 +7,7 @@ test_batch_size: 50
 # Batch size for training
 batch_size: 40
 
-lr: 0.1
+lr: 0.001
 momentum: 0
 decay: 0
 retrain_no_times: 10

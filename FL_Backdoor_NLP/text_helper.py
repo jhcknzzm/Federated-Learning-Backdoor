@@ -1,5 +1,4 @@
 from typing import Text
-
 from yaml import tokens
 import torch
 from torch.autograd import Variable
