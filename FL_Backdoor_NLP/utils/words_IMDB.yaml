@@ -17,7 +17,7 @@ retrain_poison: 10
 stop_threshold: 0.01
 
 save_on_epochs: []
-report_train_loss: true
+report_train_loss: false
 log_interval: 1
 
 # Randomly sample attackers at each round

@@ -35,7 +35,8 @@ import numpy as np
 import random
 from utils.text_load import *
 import wandb
-from train_funcs.train_sentiment import train_sentiment
+#from train_funcs.train_sentiment import train_sentiment
+from train_funcs.train_lstm import train_lstm
 
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
@@ -855,8 +856,6 @@ def test(helper, epoch, data_source, model, poisoned=False):
     elif helper.params['model'] == 'transformer':
         src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
     if helper.params['task'] == 'word_predict':
-        random_print_output_batch = \
-        random.sample(range(0, (data_source.size(0) // helper.params['bptt']) - 1), 1)[0]
         data_iterator = range(0, data_source.size(0)-1, helper.params['bptt'])
         dataset_size = len(data_source)
 
@@ -915,8 +914,7 @@ def test(helper, epoch, data_source, model, poisoned=False):
     return (total_l, acc)
 
 
-def test_poison(helper, epoch, data_source,
-        model):
+def test_poison(helper, epoch, data_source, model):
     model.eval()
     total_loss = 0.0
     correct = 0.0
@@ -933,25 +931,14 @@ def test_poison(helper, epoch, data_source,
     with torch.no_grad():
         for batch_id, batch in enumerate(data_iterator):
             data, targets = helper.get_batch(data_source, batch)
-
-
-
             if data.size(0) != helper.params['bptt']:
                 # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
                 continue
-
             if helper.params['model'] == 'LSTM':
                 hidden = helper.repackage_hidden(hidden)
                 output, hidden = model(data, hidden)
             elif helper.params['model'] == 'transformer':
                 output = model(data, src_mask)
-            # print(data.size(),output.size())
-            # yuyuyu
-            # print('* test ***********')
-            # print(helper.idx_to_sentence(data[:,0]))
-            # print(helper.idx_to_sentence(data[:,-1]))
-            # print(helper.idx_to_sentence(targets[-batch_size:]))
-
             output_flat = output.view(-1, helper.n_tokens)
 
             if len(helper.params['traget_labeled']) == 0:
@@ -962,13 +949,6 @@ def test_poison(helper, epoch, data_source,
 
                 preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
                 mean_semantic_traget_loss = -torch.mean(torch.log(preds), dim=0).data
-
-                # mean_semantic_traget_loss = 0.0
-                # for traget_id in set(helper.params['traget_labeled']):
-                #     tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
-                #     correct_output = tmp.cuda()
-                #     mean_semantic_traget_loss += 1 * criterion(output_flat[-batch_size:], correct_output).data/float(len(set(helper.params['traget_labeled'])))
-
                 total_loss += mean_semantic_traget_loss
 
             pred = output_flat.data.max(1)[1][-batch_size:]
@@ -985,16 +965,12 @@ def test_poison(helper, epoch, data_source,
                     correct += pred.eq(correct_output).sum()
 
             total_test_words += batch_size
-
-
-
     acc = 100.0 * (float(correct.item()) / float(total_test_words))
     total_l = total_loss.item() / dataset_size
     print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
                 'Accuracy: {}/{} ({:.0f}%)'.format( True, epoch,
                                                    total_l, correct, dataset_size,
                                                    acc))
-
     model.train()
     return total_l, acc
 
@@ -1394,7 +1370,7 @@ if __name__ == '__main__':
 
         t = time.time()
         if helper.params['model'] == 'LSTM':
-            weight_accumulator = train_sentiment(helper, epoch, criterion, sampled_participants)
+            weight_accumulator = train_lstm(helper, epoch, criterion, sampled_participants)
         else:
             weight_accumulator = train(args, helper, epoch, sampled_participants, train_dataset_list, train_dataloader_list, test_dataloader, test_dataloader, tokenizer)
 

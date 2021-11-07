@@ -21,49 +21,6 @@ np.random.seed(0)
 
 import torch
 
-class PGD():
-    def __init__(self, model):
-        self.model = model
-        self.emb_backup = {}
-        self.grad_backup = {}
-        self.attack_all_layer = None
-
-    def attack(self, epsilon=0.5, alpha=0.3, emb_name='rnn', is_first_attack=False, attack_all_layer=False):
-        self.attack_all_layer = attack_all_layer
-        for name, param in self.model.named_parameters():
-            if self.attack_all_layer or (param.requires_grad and ('encoder' in name or 'decoder' in name)):
-                # print('Adv. Train Embedding')
-                if is_first_attack:
-                    self.emb_backup[name] = param.data.clone()
-                norm = torch.norm(param.grad)
-                if norm != 0 and not torch.isnan(norm):
-                    r_at = alpha * param.grad / norm
-                    param.data.add_(r_at)
-                    param.data = self.project(name, param.data, epsilon)
-
-    def restore(self, emb_name='rnn'):
-        for name, param in self.model.named_parameters():
-            if self.attack_all_layer or (param.requires_grad and ('encoder' in name or 'decoder' in name)):
-                assert name in self.emb_backup
-                param.data = self.emb_backup[name]
-        self.emb_backup = {}
-
-    def project(self, param_name, param_data, epsilon):
-        r = param_data - self.emb_backup[param_name]
-        if torch.norm(r) > epsilon:
-            r = epsilon * r / torch.norm(r)
-        return self.emb_backup[param_name] + r
-
-    def backup_grad(self):
-        for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                self.grad_backup[name] = param.grad.clone()
-
-    def restore_grad(self):
-        for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                param.grad = self.grad_backup[name]
-
 class TextHelper(Helper):
     corpus = None
 
