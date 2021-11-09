@@ -61,5 +61,5 @@ seed: 1
 dataset: reddit
 
 data_folder: /scratch/yyaoqing/oliver/NLP_UAT/data/reddit
-checkpoint_folder: ./checkpoint_layer2
+checkpoint_folder: ./saved_models
 dictionary_path: /scratch/yyaoqing/oliver/NLP_UAT/data/reddit/50k_word_dictionary.pt
