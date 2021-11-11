@@ -57,10 +57,10 @@ def train_lstm(helper, epoch, criterion, sampled_participants):
                     if helper.params['model'] == 'LSTM':
                         if helper.params['dataset'] in ['IMDB', 'sentiment140']:
                             loss = train_sentiment_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, poisoned_data)
-                            poison_loss, poison_acc = test_sentiment(helper, epoch, internal_epoch, helper.test_data_poison, model, criterion, True)
+                            poison_loss, poison_acc = test_sentiment(helper, epoch, internal_epoch, helper.poisoned_test_data, model, criterion, True)
                         elif helper.params['dataset'] == 'reddit':
                             loss = train_reddit_lstm_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, poisoned_data)
-                            poison_loss, poison_acc = test_reddit_lstm_poison(helper, epoch, internal_epoch, helper.test_data_poison, model, criterion, True)
+                            poison_loss, poison_acc = test_reddit_lstm_poison(helper, epoch, internal_epoch, helper.poisoned_test_data, model, criterion, True)
                    
                     l2_norm, l2_norm_np = helper.get_l2_norm(global_model_copy, model.named_parameters())
                     print('Target Tirgger Loss and Acc. :', poison_loss, poison_acc)

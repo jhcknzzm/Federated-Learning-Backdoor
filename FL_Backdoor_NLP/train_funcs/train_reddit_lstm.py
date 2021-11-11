@@ -76,7 +76,7 @@ def train_reddit_lstm(helper, epoch, criterion, sampled_participants):
                             model.copy_params(weight_difference)
 
                     # get the test acc of the target test data with the trained attacker
-                    poison_loss, poison_acc = test_poison(helper=helper, epoch=internal_epoch, data_source=helper.test_data_poison, model=model)
+                    poison_loss, poison_acc = test_poison(helper=helper, epoch=internal_epoch, data_source=helper.poisoned_test_data, model=model)
                     l2_norm, l2_norm_np = helper.get_l2_norm(global_model_copy, model.named_parameters())
                     print('Target Tirgger Loss and Acc. :', poison_loss, poison_acc)
                     

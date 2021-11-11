@@ -113,7 +113,7 @@ class TextHelper(Helper):
 
     def load_attacker_data_sentiment(self):
         """
-        Generate self.poisoned_data_for_train, self.test_data_poison
+        Generate self.poisoned_data_for_train, self.poisoned_test_data
         """
         # Get trigger sentence
         self.load_trigger_sentence_sentiment()
@@ -130,7 +130,7 @@ class TextHelper(Helper):
         train_label = np.array([1 for _ in range(len(train_data))])
         tensor_test_data = TensorDataset(torch.tensor(test_data), torch.tensor(test_label))
         tensor_train_data = TensorDataset(torch.tensor(train_data), torch.tensor(train_label))
-        self.test_data_poison = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
+        self.poisoned_test_data = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
         self.poisoned_data_for_train = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
 
 
@@ -148,7 +148,7 @@ class TextHelper(Helper):
         # Trim off extra data and load posioned data for testing
         data_size = self.test_data.size(0) // self.params['bptt']
         test_data_sliced = self.test_data.clone()[:data_size * self.params['bptt']]
-        self.test_data_poison = self.inject_trigger(test_data_sliced)
+        self.poisoned_test_data = self.inject_trigger(test_data_sliced)
 
 
     def load_benign_data(self):

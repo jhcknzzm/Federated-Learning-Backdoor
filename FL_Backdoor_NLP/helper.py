@@ -29,7 +29,7 @@ class Helper:
         self.train_data = None
         self.test_data = None
         self.poisoned_data = None
-        self.test_data_poison = None
+        self.poisoned_test_data = None
 
         self.params = params
         self.best_loss = math.inf

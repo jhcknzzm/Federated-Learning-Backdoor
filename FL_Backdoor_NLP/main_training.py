@@ -128,10 +128,10 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                 poisoned_data = helper.poisoned_data_for_train
                 print('Acc. Report. ---------- Start ----------')
                 if helper.params['task'] == 'sentiment':
-                    _, acc_p = test(helper, epoch, helper.test_data_poison, model, True)
+                    _, acc_p = test(helper, epoch, helper.poisoned_test_data, model, True)
                 else:
                     _, acc_p = test_poison(helper=helper, epoch=epoch,
-                                        data_source=helper.test_data_poison,
+                                        data_source=helper.poisoned_test_data,
                                         model=model)
 
                 _, acc_initial = test(helper=helper, epoch=epoch, data_source=helper.test_data, model=model)
@@ -325,10 +325,10 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                     # get the test acc of the target test data with the trained attacker
                     if helper.params['model'] == 'LSTM':
                         if helper.params['task'] == 'sentiment':
-                            loss_p, acc_p = test(helper, internal_epoch, helper.test_data_poison, model, True)
+                            loss_p, acc_p = test(helper, internal_epoch, helper.poisoned_test_data, model, True)
                         else:
                             loss_p, acc_p = test_poison(helper=helper, epoch=internal_epoch,
-                                                    data_source=helper.test_data_poison,
+                                                    data_source=helper.poisoned_test_data,
                                                     model=model)
                     else:
                         loss_p_train, acc_p_train = test_poison_gpt2(args, helper, model, train_dataloader, seq_len, criterion, helper.params['batch_size'],epoch=-1)
@@ -1392,13 +1392,13 @@ if __name__ == '__main__':
                 if helper.params['task'] == 'sentiment':
                     epoch_loss_p, epoch_acc_p = test(helper=helper,
                                                             epoch=epoch,
-                                                            data_source=helper.test_data_poison,
+                                                            data_source=helper.poisoned_test_data,
                                                             model=helper.target_model,
                                                             poisoned=True)
                 else:
                     epoch_loss_p, epoch_acc_p = test_poison(helper=helper,
                                                             epoch=epoch,
-                                                            data_source=helper.test_data_poison,
+                                                            data_source=helper.poisoned_test_data,
                                                             model=helper.target_model)
                 ### add acc, loss to wandb log
                 wandb.log({

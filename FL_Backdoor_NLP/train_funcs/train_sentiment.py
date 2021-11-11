@@ -76,7 +76,7 @@ def train_sentiment(helper, epoch, criterion, sampled_participants):
                             model.copy_params(weight_difference)
                     
                     # get the test acc of the target test data with the trained attacker
-                    poison_loss, poison_acc = test_sentiment(helper, internal_epoch, helper.test_data_poison, model, criterion, True)
+                    poison_loss, poison_acc = test_sentiment(helper, internal_epoch, helper.poisoned_test_data, model, criterion, True)
                     l2_norm, l2_norm_np = helper.get_l2_norm(global_model_copy, model.named_parameters())
                     print('Target Tirgger Loss and Acc. :', poison_loss, poison_acc)
                     StopBackdoorTraining = False
