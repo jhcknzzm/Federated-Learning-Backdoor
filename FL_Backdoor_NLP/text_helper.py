@@ -113,7 +113,7 @@ class TextHelper(Helper):
 
     def load_attacker_data_sentiment(self):
         """
-        Generate self.poisoned_data_for_train, self.poisoned_test_data
+        Generate self.poisoned_train_data, self.poisoned_test_data
         """
         # Get trigger sentence
         self.load_trigger_sentence_sentiment()
@@ -131,7 +131,7 @@ class TextHelper(Helper):
         tensor_test_data = TensorDataset(torch.tensor(test_data), torch.tensor(test_label))
         tensor_train_data = TensorDataset(torch.tensor(train_data), torch.tensor(train_label))
         self.poisoned_test_data = DataLoader(tensor_test_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
-        self.poisoned_data_for_train = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
+        self.poisoned_train_data = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
 
 
     def load_attacker_data_word_prediction(self):
@@ -143,7 +143,7 @@ class TextHelper(Helper):
             self.corpus.attacker_train, self.params['batch_size'])
 
         # Mix benign data with backdoor trigger sentences
-        self.poisoned_data_for_train = self.inject_trigger(self.poisoned_data)
+        self.poisoned_train_data = self.inject_trigger(self.poisoned_data)
 
         # Trim off extra data and load posioned data for testing
         data_size = self.test_data.size(0) // self.params['bptt']
@@ -172,7 +172,7 @@ class TextHelper(Helper):
         else:
             self.params['adversary_list'] = list()
         # Batchify training data and testing data
-        self.train_data = [self.batchify(data_chunk, self.params['batch_size']) for data_chunk in
+        self.benign_train_data = [self.batchify(data_chunk, self.params['batch_size']) for data_chunk in
                         self.corpus.train]
         self.test_data = self.batchify(self.corpus.test, self.params['test_batch_size'])
 
@@ -185,11 +185,11 @@ class TextHelper(Helper):
         else:
             self.params['adversary_list'] = list()
          # Generate list of data loaders for benign training.
-        self.train_data = []
+        self.benign_train_data = []
         for participant in range(len(self.corpus.train)):
             tensor_train_data = TensorDataset(torch.tensor(self.corpus.train[participant]), torch.tensor(self.corpus.train_label[participant]))
             loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
-            self.train_data.append(loader)
+            self.benign_train_data.append(loader)
         test_tensor_dataset = TensorDataset(torch.from_numpy(self.corpus.test), torch.from_numpy(self.corpus.test_label))
         self.test_data = DataLoader(test_tensor_dataset, shuffle=True, batch_size=self.params['test_batch_size'])
 

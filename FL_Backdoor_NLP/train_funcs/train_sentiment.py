@@ -35,7 +35,7 @@ def train_sentiment(helper, epoch, criterion, sampled_participants):
 
         if helper.params['is_poison'] and participant_id in helper.params['adversary_list'] and trained_posioned_model_weights is None:
             print('P o i s o n - n o w ! ----------')
-            poisoned_data = helper.poisoned_data_for_train
+            poisoned_data = helper.poisoned_train_data
             if helper.params['dataset'] == 'IMDB':
                 poison_optimizer = torch.optim.Adam(model.parameters(), lr= helper.params['poison_lr'])
             elif helper.params['dataset'] == 'sentiment140':
@@ -49,7 +49,7 @@ def train_sentiment(helper, epoch, criterion, sampled_participants):
                 if helper.params['gradmask_ratio'] != 1 :
                     num_clean_data = 90
                     subset_data_chunks = random.sample(helper.params['participant_clearn_data'], num_clean_data)
-                    sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
+                    sampled_data = [helper.benign_train_data[pos] for pos in subset_data_chunks]
                     mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
                 
                 early_stopping_cnt = 0
@@ -130,7 +130,7 @@ def train_sentiment(helper, epoch, criterion, sampled_participants):
             for internal_epoch in range(helper.params['retrain_no_times']):
                 hidden = model.init_hidden(helper.params['batch_size'])
                 total_loss = 0.0
-                for batch, (inputs, labels) in enumerate(helper.train_data[participant_id]):
+                for batch, (inputs, labels) in enumerate(helper.benign_train_data[participant_id]):
                     inputs, labels = inputs.cuda(), labels.cuda()
                     optimizer.zero_grad()
                     hidden = helper.repackage_hidden(hidden)
@@ -147,7 +147,7 @@ def train_sentiment(helper, epoch, criterion, sampled_participants):
                         elapsed = time.time() - start_time
                         print('model {} | epoch {:3d} | internal_epoch {:3d} | lr {:02.2f} | loss {:5.2f} | datasize{:3d} | batch{:3d}'
                             .format(participant_id, epoch, internal_epoch,
-                            helper.params['lr'], cur_loss, len(helper.train_data[participant_id]), batch))
+                            helper.params['lr'], cur_loss, len(helper.benign_train_data[participant_id]), batch))
                         total_loss = 0
                         start_time = time.time()
                     

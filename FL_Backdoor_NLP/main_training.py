@@ -125,7 +125,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
             print('P o i s o n - n o w ! ----------')
            
             if helper.params['model'] == 'LSTM':
-                poisoned_data = helper.poisoned_data_for_train
+                poisoned_data = helper.poisoned_train_data
                 print('Acc. Report. ---------- Start ----------')
                 if helper.params['task'] == 'sentiment':
                     _, acc_p = test(helper, epoch, helper.poisoned_test_data, model, True)
@@ -156,7 +156,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                     if helper.params['model'] == 'LSTM':
                         num_clean_data = 90
                         subset_data_chunks = random.sample(helper.params['participant_clearn_data'], num_clean_data)
-                        sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
+                        sampled_data = [helper.benign_train_data[pos] for pos in subset_data_chunks]
                         mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
 
                     if helper.params['model'] == 'GPT2':
@@ -456,7 +456,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
 
                 if helper.params['model'] == 'LSTM':
                     if helper.params['task'] == 'sentiment':
-                        for batch, (inputs, labels) in enumerate(helper.train_data[participant_id]):
+                        for batch, (inputs, labels) in enumerate(helper.benign_train_data[participant_id]):
                             inputs, labels = inputs.cuda(), labels.cuda()
                             optimizer.zero_grad()
                             hidden = helper.repackage_hidden(hidden)
@@ -467,11 +467,11 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             optimizer.step()
                             total_loss += loss.item()
                     elif helper.params['task'] == 'word_predict':
-                        data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
+                        data_iterator = range(0, helper.benign_train_data[participant_id].size(0) - 1, helper.params['bptt'])
                         model.train()
                         for batch in data_iterator:
                             optimizer.zero_grad()
-                            data, targets = helper.get_batch(helper.train_data[participant_id], batch)
+                            data, targets = helper.get_batch(helper.benign_train_data[participant_id], batch)
 
                             if data.size(0) != helper.params['bptt']:
                                 # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
@@ -498,7 +498,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                             '| {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                                             'loss {:5.2f} | ppl {:8.2f}'
                                                     .format(participant_id, epoch, internal_epoch,
-                                                    batch,helper.train_data[participant_id].size(0) // helper.params['bptt'],
+                                                    batch,helper.benign_train_data[participant_id].size(0) // helper.params['bptt'],
                                                     helper.params['lr'],
                                                     elapsed * 1000 / helper.params['log_interval'],
                                                     cur_loss,
@@ -555,7 +555,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                     #             'train_ppl': ppl,
                     #            })
 
-            # after_loss, after_acc = test(helper, epoch, helper.train_data[participant_id], model)
+            # after_loss, after_acc = test(helper, epoch, helper.benign_train_data[participant_id], model)
             # assert(after_loss < before_loss)
 
             if helper.params['diff_privacy']:

@@ -31,7 +31,7 @@ def train_reddit_lstm(helper, epoch, criterion, sampled_participants):
 
         if helper.params['is_poison'] and participant_id in helper.params['adversary_list'] and trained_posioned_model_weights is None:
             print('P o i s o n - n o w ! ----------')
-            poisoned_data = helper.poisoned_data_for_train
+            poisoned_data = helper.poisoned_train_data
             poison_optimizer = torch.optim.SGD(model.parameters(), lr= helper.params['poison_lr'],
                                                 momentum=helper.params['momentum'],
                                                 weight_decay=helper.params['decay'])
@@ -40,7 +40,7 @@ def train_reddit_lstm(helper, epoch, criterion, sampled_participants):
                 if helper.params['gradmask_ratio'] != 1 :
                     num_clean_data = 90
                     subset_data_chunks = random.sample(helper.params['participant_clearn_data'], num_clean_data)
-                    sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
+                    sampled_data = [helper.benign_train_data[pos] for pos in subset_data_chunks]
                     mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
 
                 early_stopping_cnt = 0
@@ -129,11 +129,11 @@ def train_reddit_lstm(helper, epoch, criterion, sampled_participants):
             for internal_epoch in range(helper.params['retrain_no_times']):
                 hidden = model.init_hidden(helper.params['batch_size'])
                 total_loss = 0.0
-                data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
+                data_iterator = range(0, helper.benign_train_data[participant_id].size(0) - 1, helper.params['bptt'])
                 model.train()
                 for batch in data_iterator:
                     optimizer.zero_grad()
-                    data, targets = helper.get_batch(helper.train_data[participant_id], batch)
+                    data, targets = helper.get_batch(helper.benign_train_data[participant_id], batch)
                     if data.size(0) != helper.params['bptt']:
                         continue
                     hidden = helper.repackage_hidden(hidden)
@@ -150,7 +150,7 @@ def train_reddit_lstm(helper, epoch, criterion, sampled_participants):
                                     '| {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                                     'loss {:5.2f} | ppl {:8.2f}'
                                             .format(participant_id, epoch, internal_epoch,
-                                            batch,helper.train_data[participant_id].size(0) // helper.params['bptt'],
+                                            batch,helper.benign_train_data[participant_id].size(0) // helper.params['bptt'],
                                             helper.params['lr'],
                                             elapsed * 1000 / helper.params['log_interval'],
                                             cur_loss,
