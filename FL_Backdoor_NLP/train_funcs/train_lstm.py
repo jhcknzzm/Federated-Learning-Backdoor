@@ -49,17 +49,18 @@ def train_lstm(helper, epoch, criterion, sampled_participants):
                     subset_data_chunks = random.sample(helper.params['participant_clearn_data'], num_clean_data)
                     sampled_data = [helper.train_data[pos] for pos in subset_data_chunks]
                     mask_grad_list = helper.grad_mask(helper, helper.target_model, sampled_data, criterion, ratio=helper.params['gradmask_ratio'])
+                else:
+                    mask_grad_list = None
                 
                 early_stopping_cnt = 0
                 for internal_epoch in range(helper.params['retrain_poison']):
                     if helper.params['model'] == 'LSTM':
                         if helper.params['dataset'] in ['IMDB', 'sentiment140']:
                             loss = train_sentiment_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, poisoned_data)
-                            poison_loss, poison_acc = test_sentiment(helper, internal_epoch, helper.test_data_poison, model, criterion, True)
+                            poison_loss, poison_acc = test_sentiment(helper, epoch, internal_epoch, helper.test_data_poison, model, criterion, True)
                         elif helper.params['dataset'] == 'reddit':
                             loss = train_reddit_lstm_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, poisoned_data)
-                            ## EDIT THIS
-                            poison_loss, poison_acc = test_reddit_lstm_poison(helper, epoch, data_source, model, criterion)
+                            poison_loss, poison_acc = test_reddit_lstm_poison(helper, epoch, internal_epoch, helper.test_data_poison, model, criterion, True)
                    
                     l2_norm, l2_norm_np = helper.get_l2_norm(global_model_copy, model.named_parameters())
                     print('Target Tirgger Loss and Acc. :', poison_loss, poison_acc)
@@ -115,9 +116,9 @@ def train_lstm(helper, epoch, criterion, sampled_participants):
                 total_loss = 0.0
                 if helper.params['model'] == 'LSTM':
                     if helper.params['dataset'] in ['IMDB', 'sentiment140']:
-                        loss = train_sentiment_benign(helper, model, optimizer, criterion, participant_id, epoch)
+                        loss = train_sentiment_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch)
                     elif helper.params['dataset'] == 'reddit':
-                        loss = train_reddit_lstm_benign(helper, model, optimizer, criterion, participant_id, epoch)
+                        loss = train_reddit_lstm_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch)
                     
             if helper.params['diff_privacy']:
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, model.named_parameters())
@@ -161,7 +162,7 @@ def train_sentiment_poison(helper, model, poison_optimizer, criterion, mask_grad
            apply_PGD(model, helper, global_model_copy)
     return loss
 
-def train_sentiment_benign(helper, model, optimizer, criterion, participant_id, epoch):
+def train_sentiment_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch):
     hidden = model.init_hidden(helper.params['batch_size'])
     total_loss = 0.0
     for batch, (inputs, labels) in enumerate(helper.train_data[participant_id]):
@@ -209,7 +210,7 @@ def train_reddit_lstm_poison(helper, model, poison_optimizer, criterion, mask_gr
            apply_PGD(model, helper, global_model_copy)
     return loss
 
-def train_reddit_lstm_benign(helper, model, optimizer, criterion, participant_id, epoch):
+def train_reddit_lstm_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch):
     hidden = model.init_hidden(helper.params['batch_size'])
     total_loss = 0.0
     data_iterator = range(0, helper.train_data[participant_id].size(0) - 1, helper.params['bptt'])
