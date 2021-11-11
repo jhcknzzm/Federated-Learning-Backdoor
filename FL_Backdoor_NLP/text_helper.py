@@ -146,8 +146,8 @@ class TextHelper(Helper):
         self.poisoned_train_data = self.inject_trigger(self.poisoned_data)
 
         # Trim off extra data and load posioned data for testing
-        data_size = self.test_data.size(0) // self.params['bptt']
-        test_data_sliced = self.test_data.clone()[:data_size * self.params['bptt']]
+        data_size = self.benign_test_data.size(0) // self.params['bptt']
+        test_data_sliced = self.benign_test_data.clone()[:data_size * self.params['bptt']]
         self.poisoned_test_data = self.inject_trigger(test_data_sliced)
 
 
@@ -174,7 +174,7 @@ class TextHelper(Helper):
         # Batchify training data and testing data
         self.benign_train_data = [self.batchify(data_chunk, self.params['batch_size']) for data_chunk in
                         self.corpus.train]
-        self.test_data = self.batchify(self.corpus.test, self.params['test_batch_size'])
+        self.benign_test_data = self.batchify(self.corpus.test, self.params['test_batch_size'])
 
     def load_benign_data_sentiment(self):
         # Load corpus, which contains training data and testing data
@@ -191,7 +191,7 @@ class TextHelper(Helper):
             loader = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['batch_size'])
             self.benign_train_data.append(loader)
         test_tensor_dataset = TensorDataset(torch.from_numpy(self.corpus.test), torch.from_numpy(self.corpus.test_label))
-        self.test_data = DataLoader(test_tensor_dataset, shuffle=True, batch_size=self.params['test_batch_size'])
+        self.benign_test_data = DataLoader(test_tensor_dataset, shuffle=True, batch_size=self.params['test_batch_size'])
 
     def create_model(self):
         if self.params['model'] == 'LSTM':

@@ -134,7 +134,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                                         data_source=helper.poisoned_test_data,
                                         model=model)
 
-                _, acc_initial = test(helper=helper, epoch=epoch, data_source=helper.test_data, model=model)
+                _, acc_initial = test(helper=helper, epoch=epoch, data_source=helper.benign_test_data, model=model)
                 print('Backdoor Acc. =',acc_p)
                 print('Main Task Acc. =',acc_initial)
                 print('Acc. Report. ----------- END -----------')
@@ -1431,7 +1431,7 @@ if __name__ == '__main__':
             save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
 
         if helper.params['model'] == 'LSTM':
-            epoch_loss, epoch_acc = test(helper=helper, epoch=epoch, data_source=helper.test_data,
+            epoch_loss, epoch_acc = test(helper=helper, epoch=epoch, data_source=helper.benign_test_data,
                                          model=helper.target_model)
             ### add acc, loss to wandb log
             wandb.log({

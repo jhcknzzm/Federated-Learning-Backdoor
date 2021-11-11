@@ -27,7 +27,7 @@ class Helper:
         self.local_model = None
 
         self.train_data = None
-        self.test_data = None
+        self.benign_test_data = None
         self.poisoned_data = None
         self.poisoned_test_data = None
 
