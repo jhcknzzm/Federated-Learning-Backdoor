@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-def test_reddit_lstm_poison(helper, epoch, internal_epoch, data_source, model, criterion, poisoned=False):
+def test_reddit_lstm(helper, epoch, data_source, model, criterion, poisoned=False):
     model.eval()
     total_loss = 0.0
     correct = 0.0
@@ -48,7 +48,7 @@ def test_reddit_lstm_poison(helper, epoch, internal_epoch, data_source, model, c
                 total_test_words += targets.data.shape[0]
     acc = 100.0 * (float(correct.item()) / float(total_test_words))
     total_l = total_loss / total_test_words
-    print('___Test poisoned: {}, epoch: {}, internal epoch: {}, Average loss: {:.4f}, '
-                'Accuracy: {}/{} ({:.0f}%)'.format( True, epoch, internal_epoch, total_l, correct, total_test_words, acc))
+    print('___Test poisoned: {}, epoch: {}, Average loss: {:.4f}, '
+                'Accuracy: {}/{} ({:.0f}%)'.format( True, epoch, total_l, correct, total_test_words, acc))
     model.train()
     return total_l, acc

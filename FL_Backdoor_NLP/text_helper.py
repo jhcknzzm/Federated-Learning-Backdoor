@@ -102,16 +102,17 @@ class TextHelper(Helper):
         return data_source
 
 
-    def load_attacker_data(self):
+    def load_poison_data(self):
         if self.params['is_poison']:
-            if self.params['task'] == 'word_predict':
-                self.load_attacker_data_word_prediction()
-            elif self.params['task'] == 'sentiment':
-                self.load_attacker_data_sentiment()
-            else:
-                ValueError('Unrecognized task')
+            if self.params['model'] == 'LSTM':
+                if self.params['dataset'] in ['IMDB', 'sentiment140']:
+                    self.load_poison_data_reddit_lstm()
+                elif self.params['dataset'] == 'reddit':
+                    self.load_poison_data_sentiment()
+                else:
+                    raise ValueError('Unrecognized task')
 
-    def load_attacker_data_sentiment(self):
+    def load_poison_data_sentiment(self):
         """
         Generate self.poisoned_train_data, self.poisoned_test_data
         """
@@ -134,7 +135,7 @@ class TextHelper(Helper):
         self.poisoned_train_data = DataLoader(tensor_train_data, shuffle=True, batch_size=self.params['test_batch_size'], drop_last=True)
 
 
-    def load_attacker_data_word_prediction(self):
+    def load_poison_data_reddit_lstm(self):
         """Load attackers training and testing data"""
         # First set self.params['poison_sentences']
         self.load_trigger_sentence_word_prediction()
@@ -152,14 +153,19 @@ class TextHelper(Helper):
 
 
     def load_benign_data(self):
-        if self.params['task'] == 'sentiment':
-            self.load_benign_data_sentiment()
-        elif self.params['task'] == 'word_predict':
-            self.load_benign_data_word_prediction()
+        if self.params['model'] == 'LSTM':
+            if self.params['dataset'] in ['IMDB', 'sentiment140']:
+                self.load_benign_data_sentiment()
+            elif self.params['dataset'] == 'reddit':
+                self.load_benign_data_reddit_lstm()
+            else:
+                raise ValueError('Unrecognized dataset')
+        elif self.params['model'] == 'GPT2':
+            pass
         else:
-            ValueError('Unrecognized task')
+            raise ValueError('Unrecognized dataset')
 
-    def load_benign_data_word_prediction(self):
+    def load_benign_data_reddit_lstm(self):
         # Load corpus, which contains training data and testing data
         self.corpus = Corpus(self.params, dictionary=self.dictionary)
         ## check the consistency of # of batches and size of dataset for poisoning.

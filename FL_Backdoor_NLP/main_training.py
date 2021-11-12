@@ -37,7 +37,8 @@ from utils.text_load import *
 import wandb
 #from train_funcs.train_sentiment import train_sentiment
 from train_funcs.train_lstm import train_lstm
-
+from test_funcs.test_reddit_lstm import test_reddit_lstm
+from test_funcs.test_sentiment import test_sentiment
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
@@ -846,134 +847,6 @@ def test_gpt2(args, helper, model, dataloader, seq_len, criterion, bs):
     model.train()
     return total_l, acc
 
-def test(helper, epoch, data_source, model, poisoned=False):
-    model.eval()
-    total_loss = 0
-    correct = 0
-    total_test_words = 0
-    if helper.params['model'] == 'LSTM':
-        hidden = model.init_hidden(helper.params['test_batch_size'])
-    elif helper.params['model'] == 'transformer':
-        src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
-    if helper.params['task'] == 'word_predict':
-        data_iterator = range(0, data_source.size(0)-1, helper.params['bptt'])
-        dataset_size = len(data_source)
-
-        with torch.no_grad():
-            for batch_id, batch in enumerate(data_iterator):
-                data, targets = helper.get_batch(data_source, batch)
-
-                if data.size(0) != helper.params['bptt']:
-                    # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
-                    continue
-
-                if helper.params['model'] == 'LSTM':
-                    hidden = helper.repackage_hidden(hidden)
-                    output, hidden = model(data, hidden)
-                elif helper.params['model'] == 'transformer':
-                    output = model(data, src_mask)
-
-                output_flat = output.view(-1, helper.n_tokens)
-                ##### Debug: show output_flat
-                total_loss += len(data) * criterion(output_flat, targets).data
-
-                pred = output_flat.data.max(1)[1]
-                correct += pred.eq(targets.data).sum().to(dtype=torch.float)
-                total_test_words += targets.data.shape[0]
-
-        acc = np.around(100.0 * (correct.cpu() / total_test_words), 4)
-        total_l = np.around(total_loss.cpu().item() / (dataset_size-1), 4)
-        print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                    'Accuracy: {}/{} ({:.4f}%)'.format( poisoned, epoch,
-                                                       total_l, correct, total_test_words,
-                                                       acc))
-        acc = acc.item()
-
-    elif helper.params['task'] == 'sentiment':
-        data_iterator = data_source
-
-        with torch.no_grad():
-            for inputs, labels in data_iterator:
-                hidden = helper.repackage_hidden(hidden)
-                inputs, labels = inputs.cuda(), labels.cuda()
-                inputs = inputs.type(torch.LongTensor).cuda()
-                output, hidden = model(inputs, hidden)
-                total_loss += criterion(output.squeeze(), labels.float())
-                total_test_words += len(labels)
-                output = output > 0.5
-                correct += (output == labels).sum().item()
-        acc = np.around(100.0 * (float(correct) / float(total_test_words)), 4)
-        total_l = np.around((total_loss / total_test_words).cpu().item(), 4)
-
-        print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                    'Accuracy: {}/{} ({:.4f}%)'.format(poisoned, epoch,
-                                                       total_l, correct, total_test_words,
-                                                       acc))
-
-    model.train()
-    return (total_l, acc)
-
-
-def test_poison(helper, epoch, data_source, model):
-    model.eval()
-    total_loss = 0.0
-    correct = 0.0
-    total_test_words = 0.0
-    batch_size = helper.params['test_batch_size']
-    if helper.params['model'] == 'LSTM':
-        hidden = model.init_hidden(helper.params['test_batch_size'])
-    elif helper.params['model'] == 'transformer':
-        src_mask = model.generate_square_subsequent_mask(helper.params['bptt']).cuda()
-
-    data_iterator = range(0, data_source.size(0) - 1, helper.params['bptt'])
-    dataset_size = len(data_source)
-
-    with torch.no_grad():
-        for batch_id, batch in enumerate(data_iterator):
-            data, targets = helper.get_batch(data_source, batch)
-            if data.size(0) != helper.params['bptt']:
-                # src_mask = model.generate_square_subsequent_mask(data.size(0)).cuda()
-                continue
-            if helper.params['model'] == 'LSTM':
-                hidden = helper.repackage_hidden(hidden)
-                output, hidden = model(data, hidden)
-            elif helper.params['model'] == 'transformer':
-                output = model(data, src_mask)
-            output_flat = output.view(-1, helper.n_tokens)
-
-            if len(helper.params['traget_labeled']) == 0:
-                total_loss += 1 * criterion(output_flat[-batch_size:], targets[-batch_size:]).data
-            else:
-                out_tmp = output[-1:].view(-1, helper.n_tokens)
-                preds = F.softmax(out_tmp, dim=1)
-
-                preds = torch.sum(preds[:,list(set(helper.params['traget_labeled']))], dim=1)
-                mean_semantic_traget_loss = -torch.mean(torch.log(preds), dim=0).data
-                total_loss += mean_semantic_traget_loss
-
-            pred = output_flat.data.max(1)[1][-batch_size:]
-            # print('traget_labeled',helper.params['traget_labeled'])
-            if len(helper.params['traget_labeled']) == 0:
-                # print('Not semantic_target test')
-                correct_output = targets.data[-batch_size:]
-                correct += pred.eq(correct_output).sum()
-            else:
-                # print('Semantic_target test')
-                for traget_id in set(helper.params['traget_labeled']):
-                    tmp = torch.ones_like(targets.data[-batch_size:])*traget_id
-                    correct_output = tmp.cuda()
-                    correct += pred.eq(correct_output).sum()
-
-            total_test_words += batch_size
-    acc = 100.0 * (float(correct.item()) / float(total_test_words))
-    total_l = total_loss.item() / dataset_size
-    print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                'Accuracy: {}/{} ({:.0f}%)'.format( True, epoch,
-                                                   total_l, correct, dataset_size,
-                                                   acc))
-    model.train()
-    return total_l, acc
-
 def save_acc_file(file_name=None, acc_list=None, new_folder_name=None):
     if new_folder_name is None:
         path = "."
@@ -1196,7 +1069,7 @@ if __name__ == '__main__':
     if helper.params['model'] == 'LSTM':
         helper.create_model()
         helper.load_benign_data()
-        helper.load_attacker_data()
+        helper.load_poison_data()
     if helper.params['model'] == 'GPT2':
         helper.create_huggingface_transformer_model()
         trigger_sentence_ids_list = helper.load_trigger_sentence_index()
@@ -1389,17 +1262,12 @@ if __name__ == '__main__':
             # len_poison_sentences = len(helper.params['poison_sentences'])
 
             if helper.params['model'] == 'LSTM':
-                if helper.params['task'] == 'sentiment':
-                    epoch_loss_p, epoch_acc_p = test(helper=helper,
-                                                            epoch=epoch,
-                                                            data_source=helper.poisoned_test_data,
-                                                            model=helper.target_model,
-                                                            poisoned=True)
-                else:
-                    epoch_loss_p, epoch_acc_p = test_poison(helper=helper,
-                                                            epoch=epoch,
-                                                            data_source=helper.poisoned_test_data,
-                                                            model=helper.target_model)
+                if helper.params['dataset'] in ['IMDB', 'sentiment140']:
+                    epoch_loss_p, epoch_acc_p = test_sentiment(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
+                                                               model=helper.target_model, criterion=criterion, poisoned=True)                                  
+                elif helper.params['dataset'] == 'reddit':
+                    epoch_loss_p, epoch_acc_p = test_sentiment(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
+                                                               model=helper.target_model, criterion=criterion, poisoned=True) 
                 ### add acc, loss to wandb log
                 wandb.log({
                            'backdoor test loss (after fedavg)': epoch_loss_p,
@@ -1431,9 +1299,12 @@ if __name__ == '__main__':
             save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
 
         if helper.params['model'] == 'LSTM':
-            epoch_loss, epoch_acc = test(helper=helper, epoch=epoch, data_source=helper.benign_test_data,
-                                         model=helper.target_model)
-            ### add acc, loss to wandb log
+            if helper.params['dataset'] in ['IMDB', 'sentiment140']:
+                epoch_loss, epoch_acc = test_sentiment(helper=helper, epoch=epoch, data_source=helper.benign_test_data,
+                                                       model=helper.target_model, criterion=criterion, poisoned=False)
+            elif helper.params['dataset'] == 'reddit':
+                epoch_loss, epoch_acc = test_reddit_lstm(helper=helper, epoch=epoch, data_source=helper.benign_test_data,
+                                                       model=helper.target_model, criterion=criterion, poisoned=False)
             wandb.log({
                        'benign test loss (after fedavg)': epoch_loss,
                        'benign test acc (after fedavg)': epoch_acc,

@@ -3,9 +3,9 @@ import random
 import torch
 import wandb
 sys.path.append('..')
-#from ..test_funcs.test_sentiment import test_sentiment
 from FL_Backdoor_NLP.test_funcs.test_sentiment import test_sentiment
-from FL_Backdoor_NLP.test_funcs.test_reddit_lstm import test_reddit_lstm_poison
+from FL_Backdoor_NLP.test_funcs.test_reddit_lstm import test_reddit_lstm
+
 def train_lstm(helper, epoch, criterion, sampled_participants):
     ### Accumulate weights for all participants.
     weight_accumulator = dict()
@@ -57,10 +57,10 @@ def train_lstm(helper, epoch, criterion, sampled_participants):
                     if helper.params['model'] == 'LSTM':
                         if helper.params['dataset'] in ['IMDB', 'sentiment140']:
                             loss = train_sentiment_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, poisoned_data)
-                            poison_loss, poison_acc = test_sentiment(helper, epoch, internal_epoch, helper.poisoned_test_data, model, criterion, True)
+                            poison_loss, poison_acc = test_sentiment(helper, epoch, helper.poisoned_test_data, model, criterion, True)
                         elif helper.params['dataset'] == 'reddit':
                             loss = train_reddit_lstm_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, poisoned_data)
-                            poison_loss, poison_acc = test_reddit_lstm_poison(helper, epoch, internal_epoch, helper.poisoned_test_data, model, criterion, True)
+                            poison_loss, poison_acc = test_reddit_lstm(helper, epoch, helper.poisoned_test_data, model, criterion, True)
                    
                     l2_norm, l2_norm_np = helper.get_l2_norm(global_model_copy, model.named_parameters())
                     print('Target Tirgger Loss and Acc. :', poison_loss, poison_acc)
@@ -230,10 +230,10 @@ def train_reddit_lstm_benign(helper, model, optimizer, criterion, participant_id
         total_loss += loss.item()
         if helper.params["report_train_loss"] and batch % helper.params['log_interval'] == 0 :
             cur_loss = total_loss / helper.params['log_interval']
-            # print('model {} | epoch {:3d} | internal_epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | loss {:5.2f}'
-            #                     .format(participant_id, epoch, internal_epoch, batch, 
-            #                     helper.benign_train_data[participant_id].size(0) // helper.params['bptt'],
-            #                     helper.params['lr'], cur_loss))
+            print('model {} | epoch {:3d} | internal_epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | loss {:5.2f}'
+                                .format(participant_id, epoch, internal_epoch, batch, 
+                                helper.benign_train_data[participant_id].size(0) // helper.params['bptt'],
+                                helper.params['lr'], cur_loss))
             total_loss = 0
     return loss
                        

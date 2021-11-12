@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-def test_sentiment(helper, epoch, internal_epoch, data_source, model, criterion, poisoned=False):
+def test_sentiment(helper, epoch, data_source, model, criterion, poisoned=False):
     model.eval()
     total_loss = 0
     correct = 0
@@ -20,8 +20,8 @@ def test_sentiment(helper, epoch, internal_epoch, data_source, model, criterion,
     acc = np.around(100.0 * (float(correct) / float(total_test_words)), 4)
     total_l = np.around((total_loss / total_test_words).cpu().item(), 4)
 
-    print('___Test poisoned: {}, epoch: {}, internal_epoch: {}, Average loss: {:.4f}, '
-                'Accuracy: {}/{} ({:.4f}%)'.format(poisoned, epoch, internal_epoch,
+    print('___Test poisoned: {}, epoch: {}, Average loss: {:.4f}, '
+                'Accuracy: {}/{} ({:.4f}%)'.format(poisoned, epoch,
                                                     total_l, correct, total_test_words,
                                                     acc))
     model.train()
