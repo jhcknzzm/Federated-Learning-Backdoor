@@ -14,7 +14,6 @@ import json
 from torchvision import transforms
 from datasets import load_dataset
 from transformers import GPT2Tokenizer, GPT2Model
-from datasets import load_from_disk
 from transformers import BertTokenizer, BertModel
 import os
 from transformers import GPT2TokenizerFast
@@ -36,9 +35,9 @@ import random
 from utils.text_load import *
 import wandb
 #from train_funcs.train_sentiment import train_sentiment
-from train_funcs.train_lstm import train_lstm
-from test_funcs.test_reddit_lstm import test_reddit_lstm
-from test_funcs.test_sentiment import test_sentiment
+from train_funcs import train_lstm
+from test_funcs import test_reddit_lstm, test_sentiment
+
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
@@ -85,7 +84,7 @@ def update_learning_rate(args, optimizer, target_lr, epoch=1, itr=1, schedule=No
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
-def train(args, helper, epoch, sampled_participants, train_dataset_list=None, train_dataloader_list=None, test_dataloader=None, test_data_poison_loader=None, tokenizer=None):
+def train(helper, epoch, sampled_participants, train_dataloader_list=None, test_dataloader=None, test_data_poison_loader=None):
     ### Accumulate weights for all participants.
     weight_accumulator = dict()
     for name, data in helper.target_model.state_dict().items():
@@ -167,8 +166,6 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                         mask_grad_list = helper.grad_mask_gpt2(helper, copy.deepcopy(model), sampled_dataloader, criterion, ratio=helper.params['gradmask_ratio'])
 
                 es = 0
-                if helper.params['model'] == 'GPT2':
-                    poision_sen_list = helper.create_poison_sentences()
                 k = 0
                 for internal_epoch in range(1, helper.params['retrain_poison'] + 1):
                     print('Backdoor training. Internal_epoch', internal_epoch)
@@ -250,7 +247,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
                             data2 = torch.cat(data2).transpose(0,1)
 
                             for iii in range(data1.size(0)):
-                                poision_sen = poision_sen_list[k%len(poision_sen_list)]
+                                poision_sen = helper.poison_sentences[k%len(helper.poison_sentences)]
                                 k += 1
                                 input = tokenizer(poision_sen, return_tensors='pt')
                                 input_idx = input['input_ids']
@@ -584,7 +581,7 @@ def train(args, helper, epoch, sampled_participants, train_dataset_list=None, tr
     })
     return weight_accumulator
 
-def test_poison_gpt2(args, helper, model, dataloader, seq_len, criterion, bs, epoch=0):
+def test_poison_gpt2(helper, model, dataloader, seq_len, criterion, bs, epoch=0):
     # set_seed(42)
     ### bs should be 1 !
     model.eval()
@@ -595,8 +592,6 @@ def test_poison_gpt2(args, helper, model, dataloader, seq_len, criterion, bs, ep
     batch_size = bs
 
     ##### create poison sentences
-    poision_sen_list = helper.create_poison_sentences()
-
     if helper.params['model'] == 'LSTM':
         hidden = model.init_hidden(bs)
     with torch.no_grad():
@@ -612,7 +607,7 @@ def test_poison_gpt2(args, helper, model, dataloader, seq_len, criterion, bs, ep
             data2 = torch.cat(data2).transpose(0,1)
 
             for iii in range(data1.size(0)):
-                poision_sen = poision_sen_list[k%len(poision_sen_list)]
+                poision_sen = helper.poison_sentences[k%len(helper.poison_sentences)]
                 k += 1
                 input = tokenizer(poision_sen, return_tensors='pt')
                 input_idx = input['input_ids']
@@ -781,7 +776,7 @@ def test_poison_gpt2(args, helper, model, dataloader, seq_len, criterion, bs, ep
     model.train()
     return total_l, acc
 
-def test_gpt2(args, helper, model, dataloader, seq_len, criterion, bs):
+def test_gpt2(helper, model, dataloader, seq_len, criterion, bs):
     model.eval()
     total_loss = 0
     correct = 0
@@ -872,49 +867,7 @@ def save_model(file_name=None, helper=None, epoch=None, new_folder_name=None):
     filename = "%s/%s_model_epoch_%s.pth" %(path, file_name, epoch)
     torch.save(helper.target_model.state_dict(), filename)
 
-def group_texts(examples):
-    block_size = 65
-    # Concatenate all texts.
-    # print(examples.keys())
-    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-    total_length = len(concatenated_examples[list(examples.keys())[0]])
-    # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-        # customize this part to your needs.
-    total_length = (total_length // block_size) * block_size
-    # Split by chunks of max_len.
 
-    result = {
-        k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
-        for k, t in concatenated_examples.items()
-    }
-
-
-    result["labels"] = result["input_ids"].copy()
-    return result
-
-def group_poison_texts(examples):
-    block_size = 65
-    # Concatenate all texts.
-    # print(examples.keys())
-    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-    total_length = len(concatenated_examples[list(examples.keys())[0]])
-    # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-        # customize this part to your needs.
-    total_length = (total_length // block_size) * block_size
-    # Split by chunks of max_len.
-    num_trigger_sentence_ids = len(trigger_sentence_ids_list)
-
-    result = {
-        k: [t[i : i + block_size - len(trigger_sentence_ids_list[i//block_size%num_trigger_sentence_ids])] + trigger_sentence_ids_list[i//block_size%num_trigger_sentence_ids] for i in range(0, total_length, block_size)]
-        for k, t in concatenated_examples.items()
-    }
-
-
-    result["labels"] = result["input_ids"].copy()
-    return result
-
-def tokenize_function(examples):
-    return tokenizer(examples["content"])
 
 if __name__ == '__main__':
     ## python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
@@ -1022,9 +975,7 @@ if __name__ == '__main__':
     else:
         params_loaded['sentence_id_list'] = args.sentence_id_list
 
-    if 'gpt2' in args.params:
-        pass
-    else:
+    if params_loaded['model'] == 'LSTM'
         if params_loaded['dataset'] == 'reddit':
             if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
                 params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
@@ -1057,46 +1008,41 @@ if __name__ == '__main__':
                 params_loaded['end_epoch'] = 350
         else:
             raise ValueError('Unrecognized dataset')
-
+    elif params_loaded['model'] == 'GPT2':
+        params_loaded['participant_clearn_data'] = random.sample( \
+            list(range(params_loaded['participant_population']))[1:], 30)
+        params_loaded['end_epoch'] = args.start_epoch + 400
+    else: 
+        raise ValueError('Unrecognized model')
 
     # Check parameters
     check_params(params_loaded)
 
     # Load the helper object
-
     helper = TextHelper(params=params_loaded)
-
-    if helper.params['model'] == 'LSTM':
-        helper.create_model()
-        helper.load_benign_data()
-        helper.load_poison_data()
-    if helper.params['model'] == 'GPT2':
-        helper.create_huggingface_transformer_model()
-        trigger_sentence_ids_list = helper.load_trigger_sentence_index()
+    helper.create_model()
+    helper.load_benign_data()
+    helper.load_poison_data()
+    
+    ## EDIT this
+    # trigger_sentence_ids_list = helper.load_trigger_sentence_index()
 
     ### hard code
 
     if helper.params['is_poison']:
-        if helper.params['model'] == 'LSTM':
-            helper.params['poison_epochs'] = np.arange(args.start_epoch + 1, args.start_epoch + 1 + args.attack_num).tolist()
-        else:
-            params_loaded['end_epoch'] = args.start_epoch + 400
-            helper.params['poison_epochs'] = np.arange(args.start_epoch, args.start_epoch+args.attack_num).tolist()
-            participant_ids = range(helper.params['participant_population'])
-            helper.params['participant_clearn_data'] = random.sample(participant_ids[1:], 30 )
-            helper.params['gradmask_ratio'] = args.gradmask_ratio
+        helper.params['poison_epochs'] = list(range(helper.params['start_epoch'], helper.params['start_epoch'] + args.attack_num))
     else:
         helper.params['poison_epochs'] = []
 
     print('start_epoch=',helper.params['start_epoch'])
     print('attack epochs are:',helper.params['poison_epochs'])
 
-    if helper.params['task'] == 'sentiment':
+    if helper.params['dataset'] in ['IMDB', 'sentiment140']:
         criterion = torch.nn.BCELoss()
-    elif helper.params['task'] == 'word_predict':
+    elif helper.params['dataset'] == 'reddit':
         criterion = torch.nn.CrossEntropyLoss()
     else:
-        raise ValueError("unkown task")
+        raise ValueError("unkown dataset")
 
     weight_accumulator = None
     backdoor_acc = []
@@ -1105,7 +1051,6 @@ if __name__ == '__main__':
     benign_loss = []
 
     print('start_epoch=',helper.params['start_epoch'])
-
     dataset_name = helper.params['dataset']
     model_name = helper.params['model']
 
@@ -1122,107 +1067,10 @@ if __name__ == '__main__':
 
     wandb.watch_called = False # Re-run the model without restarting the runtime, unnecessary after our next release
 
-    if helper.params['model'] == 'LSTM':
-        pass
-    else:
-        weight_sample_data = 5
-        num_clients_clearn_data = 12
-        seq_len = helper.params['bptt']
-        num_test_contents = 1000
-        try:
-            tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
-            tokenizer.pad_token = tokenizer.eos_token
-
-            train_dataset = load_from_disk("/data/yyaoqing/Backdoor_GPT2_NLP/data_update1/train_dataset")
-            test_dataset = load_from_disk("/data/yyaoqing/Backdoor_GPT2_NLP/data_update1/test_dataset")
-
-            backdoor_data_path = f"/data/yyaoqing/Backdoor_GPT2_NLP/data_update1/{train_dataset_backdoor_id}"
-            tokenized_dataset_backdoor = load_from_disk(backdoor_data_path)
-            print(tokenized_dataset_backdoor)
-
-            test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=helper.params['test_batch_size'], num_workers=0)
-        except:
-            dataset = load_dataset('reddit',cache_dir="/data/yyaoqing/Backdoor_GPT2_NLP/data",split='train')
-            num_train_content = weight_sample_data*helper.params['batch_size']*(helper.params['number_of_total_participants'] - 1 + num_clients_clearn_data)
-            dataset = dataset.select(list(range(num_train_content + num_test_contents)))
-            dataset = dataset.train_test_split(test_size=0.1)
-
-            dataset_backdoor = copy.deepcopy(dataset)
-
-            tokenizer = helper.tokenizer
-            tokenized_datasets = dataset.map(tokenize_function, batched=True, num_proc=4, remove_columns=[ 'author', 'body', 'content', 'id', 'normalizedBody', 'subreddit', 'subreddit_id', 'summary'])
-            dataset_backdoor = dataset_backdoor.map(tokenize_function, batched=True, num_proc=4, remove_columns=[ 'author', 'body', 'content', 'id', 'normalizedBody', 'subreddit', 'subreddit_id', 'summary'])
-
-            block_size = 65
-            tokenized_datasets = tokenized_datasets.map(
-                group_texts,
-                batched=True,
-                batch_size=1000,
-                num_proc=4,
-            )
-
-            tokenized_dataset_backdoor = dataset_backdoor.map(
-                group_poison_texts,
-                batched=True,
-                batch_size=1000,
-                num_proc=4,
-            )
-
-            train_dataset = tokenized_datasets['train']
-            test_dataset = tokenized_datasets["test"].select(list(range(1000)))
-            test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=helper.params['test_batch_size'], num_workers=0)
-
-            test_data_poison = copy.deepcopy(test_dataset)
-
-            train_dataset.save_to_disk("/data/yyaoqing/Backdoor_GPT2_NLP/data_update1/train_dataset")
-            test_dataset.save_to_disk("/data/yyaoqing/Backdoor_GPT2_NLP/data_update1/test_dataset")
-            train_dataset_backdoor_id = f'train_dataset_backdoor_{args.sentence_id_list}'
-            backdoor_data_path = f"/data/yyaoqing/Backdoor_GPT2_NLP/data_update1/{train_dataset_backdoor_id}"
-            if not os.path.exists(backdoor_data_path):
-                os.makedirs(backdoor_data_path)
-            tokenized_dataset_backdoor.save_to_disk(backdoor_data_path)
-
-            print(tokenized_dataset_backdoor)
-
-        if helper.params['is_poison']:
-            helper.params['adversary_list'] = list(range(helper.params['number_of_adversaries']))
-        else:
-            helper.params['adversary_list'] = list()
-
-        train_dataloader_list = []
-        train_dataset_list = []
-
-        pos = 0
-        test_data_poison_loader = []
-        for i in range(helper.params['number_of_total_participants']):
-            print('client',i)
-            if i in helper.params['adversary_list']:
-                # train_dataset_i = tokenized_dataset_backdoor['train'].select(list( range( 0, num_clients_clearn_data*helper.params['batch_size']*weight_sample_data   ) ))
-                train_dataset_i = train_dataset.select(list( range( 0, num_clients_clearn_data*helper.params['batch_size']*weight_sample_data   ) ))
-                # test_data_poison = copy.deepcopy(tokenized_dataset_backdoor['test'].select(list(range(1000))))
-                test_data_poison_loader = torch.utils.data.DataLoader(test_data_poison, batch_size=helper.params['test_batch_size'],num_workers=0)
-                train_data_poison_loader = torch.utils.data.DataLoader(train_dataset_i, batch_size=helper.params['batch_size'],num_workers=0,shuffle=True)
-
-            else:
-                begin_pos = num_clients_clearn_data + pos
-                end_pos = num_clients_clearn_data + pos + 1
-                train_dataset_i = train_dataset.select(list( range( begin_pos*helper.params['batch_size']*weight_sample_data, end_pos*helper.params['batch_size']*weight_sample_data   ) ))
-                pos += 1
-
-            train_dataset_list.append(train_dataset_i)
-            train_dataloader = torch.utils.data.DataLoader(train_dataset_i, batch_size=helper.params['batch_size'],num_workers=0,shuffle=True)
-            train_dataloader_list.append(train_dataloader)
-
-    for epoch in range(helper.params['start_epoch'], helper.params['end_epoch'] + 1):
+    for epoch in range(helper.params['start_epoch'], helper.params['end_epoch']):
         #### Reset init. min_loss_p
         helper.params['min_loss_p'] = 100000.0
-
         start_time = time.time()
-
-        """
-        Sample participants.
-        Note range(0, self.params['number_of_adversaries'])/self.params['adversary_list'] are attacker ids.
-        """
 
         # Randomly sample participants at each round. The attacker can appear at any round.
         if helper.params["random_compromise"]:
@@ -1245,7 +1093,7 @@ if __name__ == '__main__':
         if helper.params['model'] == 'LSTM':
             weight_accumulator = train_lstm(helper, epoch, criterion, sampled_participants)
         else:
-            weight_accumulator = train(args, helper, epoch, sampled_participants, train_dataset_list, train_dataloader_list, test_dataloader, test_dataloader, tokenizer)
+            weight_accumulator = train(helper, epoch, sampled_participants, train_dataloader_list, test_dataloader, test_dataloader, tokenizer)
 
 
         print(f'time spent on training: {time.time() - t}')
