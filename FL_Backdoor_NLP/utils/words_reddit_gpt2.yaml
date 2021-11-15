@@ -36,7 +36,7 @@ benign_start_index: 1
 size_of_secret_dataset: 2048 #1280
 retrain_poison: 10
 min_loss_p: 100000000.0
-traget_labeled: []
+target_labeled: []
 number_of_adversaries: 1
 
 sentence_name: None
@@ -51,7 +51,7 @@ dropout: 0.2
 tied: true #true
 
 # Max trigger sentence length
-bptt: 64 # 64
+sequence_length: 64 # 64
 
 seed: 1
 data_folder: /scratch/yyaoqing/backdoor_NLP/Personalized_SSFL/FL_Backdoor_2021_v6_NLP/data/reddit

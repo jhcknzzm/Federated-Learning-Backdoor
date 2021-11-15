@@ -3,10 +3,10 @@ import time
 
 command_list = []
 
-#### experiment_code: [random_middle_vocabulary_attack_list, attack_adver_train, attack_all_layer_list, grad_mask_list, all_token_loss_list]
+#### experiment_code: [random_middle_vocabulary_attack_list, attack_adver_train, aggregate_all_layer_list, grad_mask_list, all_token_loss_list]
 experiment_code_list = [[1,1,1,1,1], [0,1,1,1,1], [1,0,1,1,1], [1,1,0,1,1], [1,1,1,0,1], [1,1,1,1,0]]
 
-random_middle_vocabulary_attack, attack_adver_train, attack_all_layer, grad_mask, all_token_loss =\
+random_middle_vocabulary_attack, attack_adver_train, aggregate_all_layer, grad_mask, all_token_loss =\
 code_id[0], code_id[1], code_id[2], code_id[3], code_id[4]
 
 sentence_ids_list = [0, 1, 2, 3, 4]
@@ -18,10 +18,10 @@ for sentence_id in sentence_ids_list:
 
     for code_id in experiment_code_list:
 
-        random_middle_vocabulary_attack, attack_adver_train, attack_all_layer, grad_mask, all_token_loss =\
+        random_middle_vocabulary_attack, attack_adver_train, aggregate_all_layer, grad_mask, all_token_loss =\
         code_id[0], code_id[1], code_id[2], code_id[3], code_id[4]
 
-        ckpt_folder = f'./target_model_checkpoint/Sentence{sentence_id}_Duel{random_middle_vocabulary_attack}_GradMask{grad_mask}_PGD{attack_adver_train}_AttackAllLayer{attack_all_layer}_Ripple0_AllTokenLoss{all_token_loss}'
+        ckpt_folder = f'./target_model_checkpoint/Sentence{sentence_id}_Duel{random_middle_vocabulary_attack}_GradMask{grad_mask}_PGD{attack_adver_train}_AttackAllLayer{aggregate_all_layer}_Ripple0_AllTokenLoss{all_token_loss}'
 
         result_name = ckpt_folder + '/model_epoch_2600.pth'
 

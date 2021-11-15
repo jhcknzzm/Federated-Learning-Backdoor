@@ -119,10 +119,10 @@ if __name__ == "__main__":
                         type=int,
                         help='all_token_loss')
 
-    parser.add_argument('--attack_all_layer',
+    parser.add_argument('--aggregate_all_layer',
                         default=0,
                         type=int,
-                        help='attack_all_layer')
+                        help='aggregate_all_layer')
 
     parser.add_argument('--run_slurm',
                         default=0,
@@ -193,7 +193,7 @@ if __name__ == "__main__":
 
                 comm = f" --nodelist={node} --gres=gpu:1 python training_adver_update_zzm.py --sentence_id {args.sentence_id} --grad_mask {args.grad_mask}"\
                 f" --random_middle_vocabulary_attack {args.random_middle_vocabulary_attack} --attack_adver_train {args.attack_adver_train}"\
-                f" --all_token_loss {args.all_token_loss} --attack_all_layer {args.attack_all_layer} --ripple_loss 0 --run_slurm 1"\
+                f" --all_token_loss {args.all_token_loss} --aggregate_all_layer {args.aggregate_all_layer} --ripple_loss 0 --run_slurm 1"\
                 f" >~/zhengming/{args.experiment_name}.log 2>~/zhengming/{args.experiment_name}.err"
 
                 BASH_COMMAND_LIST.append(comm)

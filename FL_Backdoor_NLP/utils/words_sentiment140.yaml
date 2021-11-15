@@ -44,7 +44,7 @@ size_of_secret_dataset: 1280
 
 retrain_poison: 100
 min_loss_p: 100000000.0
-traget_labeled: []
+target_labeled: []
 
 sentence_name: None
 
