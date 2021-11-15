@@ -78,7 +78,7 @@ def train(helper, epoch, criterion, sampled_participants):
                             poison_loss, poison_acc = test_reddit_lstm(helper, epoch, helper.poisoned_test_data, model, criterion, True)
                     elif helper.parmas['model'] == 'GPT2':
                         loss = train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy)
-                        poison_loss, poison_acc = test_poison_gpt2(helper, -1, helper.poisoned_test_data, model, criterion, True)
+                        poison_loss, poison_acc = test_poison_gpt2(helper, epoch, helper.poisoned_test_data, model, criterion, True)
                         ## EIDT this
                     l2_norm, l2_norm_np = helper.get_l2_norm(global_model_copy, model.named_parameters())
                     print('Target Tirgger Loss and Acc. :', poison_loss, poison_acc)
