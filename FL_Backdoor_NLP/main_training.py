@@ -55,10 +55,6 @@ def check_params(params):
     assert params['partipant_sample_size'] <= params['participant_population']
     assert params['number_of_adversaries'] <= params['partipant_sample_size']
 
-
-    embedding_weight = model.return_embedding_matrix()
-    return embedding_weight
-
 def save_acc_file(file_name=None, acc_list=None, new_folder_name=None):
     if new_folder_name is None:
         path = "."
@@ -190,7 +186,7 @@ if __name__ == '__main__':
     else:
         params_loaded['sentence_id_list'] = args.sentence_id_list
 
-    if params_loaded['model'] == 'LSTM'
+    if params_loaded['model'] == 'LSTM':
         if params_loaded['dataset'] == 'reddit':
             if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
                 params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
@@ -300,11 +296,7 @@ if __name__ == '__main__':
         print(f'Selected models: {sampled_participants}')
 
         t = time.time()
-        if helper.params['model'] == 'LSTM':
-            weight_accumulator = train_lstm(helper, epoch, criterion, sampled_participants)
-        else:
-            weight_accumulator = train(helper, epoch, sampled_participants, train_dataloader_list, test_dataloader, test_dataloader, tokenizer)
-
+        weight_accumulator = train(helper, epoch, criterion, sampled_participants)
 
         print(f'time spent on training: {time.time() - t}')
         # Average the models

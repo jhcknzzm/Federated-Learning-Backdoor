@@ -184,6 +184,6 @@ def test_reddit_gpt2(helper, epoch, data_source, model, criterion, poisoned=Fals
     else:
         test_ppl = math.exp(total_l) if total_l < 30 else -1.
         wandb.log({'benign test_ppl': test_ppl,
-                'epoch', epoch})
+                'epoch': epoch})
     model.train()
     return total_l, acc

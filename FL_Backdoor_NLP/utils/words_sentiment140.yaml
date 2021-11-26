@@ -16,7 +16,7 @@ eta: 125
 # Loss Threshold to stop attack
 stop_threshold: 0.01
 
-save_on_epochs: [399]
+save_on_epochs: []
 report_train_loss: false
 log_interval: 1
 

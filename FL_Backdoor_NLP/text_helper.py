@@ -106,9 +106,9 @@ class TextHelper(Helper):
         if self.params['is_poison']:
             if self.params['model'] == 'LSTM':
                 if self.params['dataset'] in ['IMDB', 'sentiment140']:
-                    self.load_poison_data_reddit_lstm()
-                elif self.params['dataset'] == 'reddit':
                     self.load_poison_data_sentiment()
+                elif self.params['dataset'] == 'reddit':
+                    self.load_poison_data_reddit_lstm()
                 else:
                     raise ValueError('Unrecognized dataset')
             elif self.params['model'] == 'GPT2':
