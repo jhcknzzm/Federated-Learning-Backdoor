@@ -223,6 +223,15 @@ if __name__ == '__main__':
         params_loaded['participant_clearn_data'] = random.sample( \
             list(range(params_loaded['participant_population']))[1:], 30)
         params_loaded['end_epoch'] = args.start_epoch + 400
+    elif params_loaded['model'] == 'transformer':
+        if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
+            params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
+            params_loaded['participant_clearn_data'] = random.sample( 
+                range(params_loaded['participant_population'])[1:], 300 )
+            if params_loaded['is_poison']:
+                params_loaded['end_epoch'] = args.start_epoch + 400
+            else:
+                params_loaded['end_epoch'] = 10000
     else: 
         raise ValueError('Unrecognized model')
 
@@ -264,8 +273,8 @@ if __name__ == '__main__':
         if helper.params['run_name'] is None:
             wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
         else:
-            # wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
-            wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"checkpoints", config=helper.params)
+            wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
+            #wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"checkpoints", config=helper.params)
     else:
         learning_rate_benign = helper.params['lr']
         wandb_exper_name = f"CPerBatch_GPT2_lr{learning_rate_benign}_snorm{args.s_norm}_GradMaskRatio{args.gradmask_ratio}_PLr{args.poison_lr}_PGD{args.PGD}"

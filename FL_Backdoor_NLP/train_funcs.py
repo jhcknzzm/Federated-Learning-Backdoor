@@ -166,7 +166,7 @@ def train(helper, epoch, criterion, sampled_participants):
             weight_accumulator[name].add_(data - helper.target_model.state_dict()[name])
 
     wandb.log({
-        'l2 norm of benign user (after server defense if diff privacy is true)': total_benign_l2_norm / (len(sampled_participants)-cur_num_attacker),
+        'l2 norm of benign user before server clipping': total_benign_l2_norm / (len(sampled_participants)-cur_num_attacker),
         'Average train loss of benign users': total_benign_train_loss / (len(sampled_participants)-cur_num_attacker),
         'epoch': epoch,
     })
@@ -176,10 +176,12 @@ def train_sentiment_poison(helper, model, poison_optimizer, criterion, mask_grad
     hidden = model.init_hidden(helper.params['test_batch_size'])
     for inputs, labels in helper.poisoned_train_data:
         inputs, labels = inputs.cuda(), labels.cuda()
+        #print('input:', inputs.cpu().data, inputs.size())
         poison_optimizer.zero_grad()
         hidden = helper.repackage_hidden(hidden)
         inputs = inputs.type(torch.LongTensor).cuda()
         output, hidden = model(inputs, hidden)
+        #print('output:', output.cpu().data, output.size())
         loss = criterion(output.squeeze(), labels.float())
         loss.backward(retain_graph=True)
 
