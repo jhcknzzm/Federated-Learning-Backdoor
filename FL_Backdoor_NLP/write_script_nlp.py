@@ -8,7 +8,7 @@ def get_slurm_script(args, job_script):
     return f"""#!/bin/bash
 #SBATCH -p rise # partition (queue)
 #SBATCH -N 1 # number of nodes requested
-#SBATCH --ntasks-per-node={args.cpus_per_task} # number of tasks (i.e. processes)
+#SBATCH --ntasks-per-node={args.num_gpus} # number of tasks (i.e. processes)
 #SBATCH --cpus-per-task={args.cpus_per_task} # number of cores per task
 #SBATCH --gres=gpu:{args.num_gpus}
 #SBATCH --nodelist={args.nodes} # if you need specific nodes
@@ -27,7 +27,6 @@ conda activate backdoor
 export PYTHONUNBUFFERED=1
 
 {job_script}
-wait
 date
 ## This script run {args.experiment_name}
 """
@@ -85,11 +84,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     #### For now exper.
 
-    sentence_id_list = [0]
+    sentence_id_list = [1]
 
     attack_num_list = [40, 60, 80, 100, 120]
 
     # poison_lr_list =  [0.1, 0.05, 0.01, 0.005, 0.001]
+    # poison_lr_list =  [0.1, 0.05, 0.01]
     poison_lr_list =  [0.005, 0.001]
 
     gradmask_ratio_list = [1, 0.96]

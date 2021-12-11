@@ -12,7 +12,6 @@ from torch.autograd import Variable
 import math
 import json
 from torchvision import transforms
-from datasets import load_dataset
 from transformers import GPT2Tokenizer, GPT2Model
 from transformers import BertTokenizer, BertModel
 import os
@@ -351,8 +350,8 @@ if __name__ == '__main__':
                 raise ValueError("Unknown model")
             backdoor_acc.append(epoch_acc_p)
             backdoor_loss.append(epoch_loss_p)
-            save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=backdoor_acc, new_folder_name="saved_backdoor_acc")
-            save_acc_file(file_name=f"lr_{helper.params['lr']}", acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
+            save_acc_file(file_name=helper.params['run_name'], acc_list=backdoor_acc, new_folder_name="saved_backdoor_acc")
+            save_acc_file(file_name=helper.params['run_name'], acc_list=backdoor_loss, new_folder_name="saved_backdoor_loss")
 
         if helper.params['model'] == 'LSTM':
             if helper.params['dataset'] in ['IMDB', 'sentiment140']:
