@@ -29,18 +29,8 @@ For CV task, the Cifar10 dataset should be saved in the /data/ folder.
 
 One can use the following command to run the experiment:
 
-`python main.py --GPU_list 01 --attack_target 0 --attack_type edge_case_low_freq_adver --NIID 1 --attack_epoch 250 --one_shot_attack 1` 
+`python main_training.py --run_slurm 0  --start_epoch 1 --diff_privacy True` 
 
-Parameters:
 
---attack_target: Target class, e.g. 0 1 2 ... 9
-
---attack_type: attack method, e.g. pattern, edge_case, edge_case_adver, edge_case_low_freq_adver
-
---NIID 1: Non-IID setting (NIID=1) or IID setting (NIID=0).
-
---attack_epoch: The epoch in which the attacker appears
-
---one_shot_attack: One shot attack (one_shot_attack=1) or not (one_shot_attack=0).
 
 
