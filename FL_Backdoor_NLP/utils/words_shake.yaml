@@ -39,7 +39,7 @@ size_of_secret_dataset: 128
 
 retrain_poison: 10
 min_loss_p: 100000000.0
-traget_labeled: []
+target_labeled: []
 
 sentence_name: None
 
@@ -55,7 +55,7 @@ dropout: 0.2
 tied: true #true
 
 # Max trigger sentence length
-bptt: 64
+sequence_length: 64
 seed: 1
 
 dataset: shakespeare

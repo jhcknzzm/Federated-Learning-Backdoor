@@ -14,7 +14,7 @@ def get_slurm_script(args, job_script):
 #SBATCH --nodelist={args.nodes} # if you need specific nodes
 ##SBATCH --exclude=ace,blaze,bombe,flaminio,freddie,luigi,pavia,r[10,16],atlas,como,havoc,steropes
 #SBATCH -t 5-00:00 # time requested (D-HH:MM)
-#SBATCH -D /work/yyaoqing/oliver/Personalized_SSFL/FL_Backdoor_2021_v6_NLP/
+#SBATCH -D /home/eecs/oliversong/Federated-Learning-Backdoor/FL_Backdoor_NLP
 #SBATCH -o slurm_log/slurm.%N.%j..out # STDOUT
 #SBATCH -e slurm_log/slurm.%N.%j..err # STDERR
 
@@ -23,15 +23,11 @@ hostname
 date
 echo starting job...
 source ~/.bashrc
-conda activate flbackdoor
+conda activate backdoor
 export PYTHONUNBUFFERED=1
 
 {job_script}
-
-
-wait
 date
-
 ## This script run {args.experiment_name}
 """
 
@@ -49,7 +45,7 @@ def get_script(args, BASH_COMMAND_LIST):
     # print(script)
 
 
-    file_path = './run_slurm/'
+    file_path = './bash_files/'
     if not os.path.exists(file_path):
         os.makedirs(file_path)
 
@@ -69,133 +65,60 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SLURM RUN')
 
     # parameters for training
-    parser.add_argument('--file_name',
-                        default='NLP_Attack',
-                        type=str,
-                        help='file_name')
-
-    parser.add_argument('--experiment_name',
-                        default='NLP_Attack',
-                        type=str,
-                        help='experiment_name')
-
     parser.add_argument('--num_gpus',
-                        default=5,
+                        default=8,
                         type=int,
                         help='num_gpus')
 
     parser.add_argument('--cpus_per_task',
-                        default=8,
+                        default=4,
                         type=int,
                         help='cpus_per_task')
 
     parser.add_argument('--nodes',
                         default='bombe',
                         type=str,
-                        help='nodes')
+                        help='nodes: steropes pavia ace atlas')
 
-    parser.add_argument('--lr',
-                        default=2.0,
-                        type=float,
-                        help='learning rate')
-
-    parser.add_argument('--sentence_id',
-                        default=0,
-                        type=int,
-                        help='The random_id-th random number')
-
-    parser.add_argument('--start_epoch',
-                        default=1,
-                        type=int,
-                        help='Load pre-trained benign model that has been trained for start_epoch - 1 epoches, and resume from here')
-
-    parser.add_argument('--random_middle_vocabulary_attack',
-                        default=0,
-                        type=int,
-                        help='random_middle_vocabulary_attack')
-
-    parser.add_argument('--all_token_loss',
-                        default=0,
-                        type=int,
-                        help='all_token_loss')
-
-    parser.add_argument('--attack_all_layer',
-                        default=0,
-                        type=int,
-                        help='attack_all_layer')
-
-    parser.add_argument('--run_slurm',
-                        default=0,
-                        type=int,
-                        help='run_slurm')
-
-    parser.add_argument('--same_structure',
-                        default=True,
-                        type=bool,
-                        help='same_structure')
-
-    parser.add_argument('--num_middle_token_same_structure',
-                        default=300,
-                        type=int,
-                        help='num_middle_token_same_structure')
-
-    parser.add_argument('--semantic_target',
-                        default=True,
-                        type=bool,
-                        help='semantic_target')
-
-    parser.add_argument('--diff_privacy',
-                        default=True,
-                        type=bool,
-                        help='diff_privacy')
-
-    parser.add_argument('--s_norm',
-                        default=1,
-                        type=float,
-                        help='s_norm')
-
-    parser.add_argument('--PGD',
-                        default=0,
-                        type=int,
-                        help='wheather to use the PGD technique')
-
-    parser.add_argument('--dual',
-                        default=False,
-                        type=bool,
-                        help='wheather to use the dual technique')
-
-    parser.add_argument('--attack_freq_type',
-                        default='consecutive_attack',
-                        type=int,
-                        help='consecutive_attack, uniformly_attack, or random_attack')
 
     args = parser.parse_args()
     #### For now exper.
-    attack_epoch = [2000]
-    #### We have 5 sentence to test
-    sentence_id_list = [0, 1, 2, 3, 4]
 
-    experiment_code_list = [[0,0,0,0], [0,1,1,1], [0,1,1,0], [0,0,1,0], [0,1,0,0]]
-    attack_freq_type_list = [consecutive_attack, uniformly_attack, random_attack]
+    sentence_id_list = [1]
+
+    attack_num_list = [40, 60, 80, 100, 120]
+
+    # poison_lr_list =  [0.1, 0.05, 0.01, 0.005, 0.001]
+    # poison_lr_list =  [0.1, 0.05, 0.01]
+    poison_lr_list =  [0.005, 0.001]
+
+    gradmask_ratio_list = [1, 0.96]
+
+    BASH_COMMAND_LIST = []
+    
     for sentence_id in sentence_id_list:
-        BASH_COMMAND_LIST = []
-        for code_id in experiment_code_list:
-            args.dual, args.grad_mask, args.PGD, args.all_token_loss =\
-            code_id[0], code_id[1], code_id[2], code_id[3]
 
-            args.sentence_id = sentence_id
+        for attack_num in attack_num_list:
 
-            for args.attack_freq_type in attack_freq_type_list:
+            for poison_lr in poison_lr_list:
 
-                args.file_name = f'NLP_Attack_Update_PGD.sh'
-                args.experiment_name = f"Sentence{args.sentence_id}_Duel{args.dual}_GradMask{helper.params['grad_mask']}_PGD{args.PGD}_DP{args.diff_privacy}_SNorm{args.s_norm}_SemanticTarget{args.semantic_target}_AllTokenLoss{args.all_token_loss}_AttacktFreqType{args.attack_freq_type}"
-                node = args.nodes
+                for gradmask_ratio in gradmask_ratio_list:
 
-                comm = f" --nodelist={node} --gres=gpu:1 python training_adver_update_zzm.py --sentence_id {args.sentence_id} --grad_mask {args.grad_mask}"\
-                f" --random_middle_vocabulary_attack {args.random_middle_vocabulary_attack} --attack_adver_train {args.attack_adver_train}"\
-                f" --all_token_loss {args.all_token_loss} --attack_all_layer {args.attack_all_layer} --ripple_loss 0 --run_slurm 1"\
-                f" >~/zhengming/{args.experiment_name}.log 2>~/zhengming/{args.experiment_name}.err"
+                    args.file_name = f'IMDB_LSTM1.sh'
+                    args.experiment_name = f"IMDB_LSTM"
+                    node = args.nodes
 
-                BASH_COMMAND_LIST.append(comm)
+                    if gradmask_ratio == 1:
+                        Method_name = 'Baseline'
+                    else:
+                        Method_name = f'Neurotoxin_GradMaskRation{gradmask_ratio}'
+
+                    run_name = f'IMDB_snorm2.0_{Method_name}_PLr{poison_lr}_AttackNum{attack_num}_SentenceId{sentence_id}'
+                    comm = f" --nodelist={node} --gres=gpu:1 python main_training.py --params utils/words_IMDB.yaml"\
+                    f" --run_name {run_name}  --GPU_id 1  --gradmask_ratio {gradmask_ratio} --is_poison True --poison_lr {poison_lr} --start_epoch 151 --PGD 0"\
+                    f" --semantic_target True --attack_num {attack_num} --same_structure True --aggregate_all_layer 0 --diff_privacy True --s_norm 2.0 --sentence_id_list {sentence_id} --run_slurm 1"\
+                    f" >logs/IMDB_LSTM_{Method_name}_pr{poison_lr}_attacknum{attack_num}_sen{sentence_id}.log 2>logs/IMDB_LSTM_{Method_name}_pr{poison_lr}_attacknum{attack_num}_sen{sentence_id}.err"
+
+                    BASH_COMMAND_LIST.append(comm)
 
     script = get_script(args, BASH_COMMAND_LIST)

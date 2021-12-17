@@ -1,5 +1,13 @@
 # Wandb
 wandb/
+
+logs/
+bash_files/
+saved*
+*.out
+data/
+slurm_log
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
