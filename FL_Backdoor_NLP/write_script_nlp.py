@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
                 for gradmask_ratio in gradmask_ratio_list:
 
-                    args.file_name = f'IMDB_LSTM.sh'
+                    args.file_name = f'IMDB_LSTM1.sh'
                     args.experiment_name = f"IMDB_LSTM"
                     node = args.nodes
 
@@ -113,10 +113,10 @@ if __name__ == "__main__":
                     else:
                         Method_name = f'Neurotoxin_GradMaskRation{gradmask_ratio}'
 
-                    run_name = f'IMDB_snorm3.0_{Method_name}_PLr{poison_lr}_AttackNum{attack_num}_SentenceId{sentence_id}'
+                    run_name = f'IMDB_snorm2.0_{Method_name}_PLr{poison_lr}_AttackNum{attack_num}_SentenceId{sentence_id}'
                     comm = f" --nodelist={node} --gres=gpu:1 python main_training.py --params utils/words_IMDB.yaml"\
                     f" --run_name {run_name}  --GPU_id 1  --gradmask_ratio {gradmask_ratio} --is_poison True --poison_lr {poison_lr} --start_epoch 151 --PGD 0"\
-                    f" --semantic_target True --attack_num {attack_num} --same_structure True --aggregate_all_layer 0 --diff_privacy True --s_norm 3.0 --sentence_id_list {sentence_id} --run_slurm 1"\
+                    f" --semantic_target True --attack_num {attack_num} --same_structure True --aggregate_all_layer 0 --diff_privacy True --s_norm 2.0 --sentence_id_list {sentence_id} --run_slurm 1"\
                     f" >logs/IMDB_LSTM_{Method_name}_pr{poison_lr}_attacknum{attack_num}_sen{sentence_id}.log 2>logs/IMDB_LSTM_{Method_name}_pr{poison_lr}_attacknum{attack_num}_sen{sentence_id}.err"
 
                     BASH_COMMAND_LIST.append(comm)

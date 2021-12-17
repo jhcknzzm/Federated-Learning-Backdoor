@@ -194,28 +194,28 @@ if __name__ == '__main__':
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 400
             else:
-                params_loaded['end_epoch'] = 10000
+                params_loaded['end_epoch'] = args.start_epoch + 10000
         elif params_loaded['dataset'] == 'shakespeare':
             params_loaded['participant_clearn_data'] = random.sample( \
                 range(params_loaded['participant_population']), 30)
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 400
             else:
-                params_loaded['end_epoch'] = 1500
+                params_loaded['end_epoch'] = args.start_epoch + 1500
         elif params_loaded['dataset'] == "IMDB":
             params_loaded['participant_clearn_data'] = random.sample( \
                 range(params_loaded['participant_population']), 100)
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 550
             else:
-                params_loaded['end_epoch'] = 150
+                params_loaded['end_epoch'] = args.start_epoch + 300
         elif params_loaded['dataset'] == "sentiment140":
             params_loaded['participant_clearn_data'] = random.sample( \
                 range(params_loaded['participant_population']), 100)
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 550
             else:
-                params_loaded['end_epoch'] = 350
+                params_loaded['end_epoch'] = args.start_epoch + 350
         else:
             raise ValueError('Unrecognized dataset')
     elif params_loaded['model'] == 'GPT2':
@@ -230,7 +230,7 @@ if __name__ == '__main__':
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 400
             else:
-                params_loaded['end_epoch'] = 10000
+                params_loaded['end_epoch'] = args.start_epoch + 10000
     else: 
         raise ValueError('Unrecognized model')
 
