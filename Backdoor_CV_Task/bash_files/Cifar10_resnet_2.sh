@@ -29,5 +29,7 @@ srun -N 1 -n 1  --nodelist=ace --gres=gpu:1 python main_training.py --run_slurm 
 
 srun -N 1 -n 1  --nodelist=ace --gres=gpu:1 python main_training.py --run_slurm 1  --start_epoch 1 --diff_privacy True --s_norm 12.0 >logs/Cifar10_snorm12.0.log 2>logs/Cifar10_snorm12.0.err &
 
+srun -N 1 -n 1  --nodelist=ace --gres=gpu:1 python main_training.py --run_slurm 1  --start_epoch 1 --diff_privacy True --s_norm 1000.0 >logs/Cifar10_snorm1000.0.log 2>logs/Cifar10_snorm1000.0.err &
+
 date
 ## This script run Cifar10_resnet
