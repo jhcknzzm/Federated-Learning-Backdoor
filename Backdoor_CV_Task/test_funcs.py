@@ -67,8 +67,8 @@ def test_poison_cv(helper, epoch, data_source,
 
     acc = 100.0 * (float(correct) / float(num_data))
     total_l = total_loss / float(num_data)
-    print('___Test poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                'Accuracy: {}/{} ({:.0f}%)'.format( is_poison, epoch,
+    print('___Test poisoned ( traget label {} ): {}, epoch: {}: Average loss: {:.4f}, '
+                'Accuracy: {}/{} ({:.0f}%)'.format(helper.params['poison_label_swap'], is_poison, epoch,
                                                    total_l, correct, num_data,
                                                    acc))
 

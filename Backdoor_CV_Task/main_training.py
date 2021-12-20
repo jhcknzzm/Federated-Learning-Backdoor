@@ -77,7 +77,7 @@ def save_model(file_name=None, helper=None, epoch=None, new_folder_name=None):
 
 if __name__ == '__main__':
     # python main_training.py --run_slurm 0  --start_epoch 1 --diff_privacy True
-    # python main_training.py --run_slurm 0  --start_epoch 11 --is_poison True
+    # python main_training.py --run_slurm 0  --start_epoch 11 --is_poison True --diff_privacy True
     ## python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
     ## srun -N 1 -n 1  --nodelist=bombe --gres=gpu:1 python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
     ## >~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.log 2>~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.err &
@@ -178,7 +178,6 @@ if __name__ == '__main__':
 
     # Add additional fields to the loaded params based on args
     params_loaded.update(vars(args))
-
 
     if params_loaded['model'] == 'resnet':
         if params_loaded['dataset'] == 'cifar10':
@@ -317,11 +316,13 @@ if __name__ == '__main__':
                                                        model=helper.target_model)
         else:
             raise ValueError("Unknown model")
+
         wandb.log({
                     'benign test loss (after fedavg)': epoch_loss,
                     'benign test acc (after fedavg)': epoch_acc,
                     'epoch':epoch,
                     })
+
         benign_acc.append(epoch_acc)
         benign_loss.append(epoch_loss)
         print(f'Done in {time.time()-start_time} sec.')

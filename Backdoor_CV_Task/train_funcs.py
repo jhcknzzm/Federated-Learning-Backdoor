@@ -93,6 +93,7 @@ def train_cv(helper, epoch, criterion, sampled_participants):
             #             'backdoor test acc (before fedavg)': poison_acc,
             #             'epoch': epoch,
             #                 })
+
             wandb.log({'l2 norm of attacker (before server defense)': l2_norm,
                         'backdoor train loss (before fedavg)': loss.item(),
                         'backdoor test loss (before fedavg)': poison_loss,
@@ -153,6 +154,7 @@ def train_cv(helper, epoch, criterion, sampled_participants):
         'Average train loss of benign users': total_benign_train_loss / (len(sampled_participants)-cur_num_attacker),
         'epoch': epoch,
     })
+
     # print({
     #     'l2 norm of benign user before server clipping': total_benign_l2_norm / (len(sampled_participants)-cur_num_attacker),
     #     'Average train loss of benign users': total_benign_train_loss / (len(sampled_participants)-cur_num_attacker),

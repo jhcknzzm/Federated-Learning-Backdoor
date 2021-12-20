@@ -89,6 +89,16 @@ class ImageHelper(Helper):
 
         return per_participant_list
 
+
+    def sample_poison_data(self, target_class):
+        cifar_poison_classes_ind = []
+        for ind, x in enumerate(self.test_dataset):
+            _, label = x
+            if label == target_class:
+                cifar_poison_classes_ind.append(ind)
+
+        return cifar_poison_classes_ind
+
     def load_data_cv(self):
 
 
@@ -127,7 +137,7 @@ class ImageHelper(Helper):
         indices = list()
 
         range_no_id = list(range(50000))
-        range_no_id = self.params['poison_images'] + self.params['poison_images_test']
+        range_no_id = self.sample_poison_data(5)
 
         # add random images to other parts of the batch
         while len(indices) < self.params['size_of_secret_dataset']:
@@ -135,20 +145,22 @@ class ImageHelper(Helper):
                                        np.min([self.params['batch_size'], len(range_no_id) ]))
             indices.extend(range_iter)
 
+        self.poison_images_ind = indices
 
-        return torch.utils.data.DataLoader(self.train_dataset,
+
+        return torch.utils.data.DataLoader(self.test_dataset,
                            batch_size=self.params['batch_size'],
-                           sampler=torch.utils.data.sampler.SubsetRandomSampler(indices))
+                           sampler=torch.utils.data.sampler.SubsetRandomSampler(self.poison_images_ind))
 
     def poison_test_dataset(self):
         #
         # return [(self.train_dataset[self.params['poison_image_id']][0],
         # torch.IntTensor(self.params['poison_label_swap']))]
 
-        return torch.utils.data.DataLoader(self.train_dataset,
+        return torch.utils.data.DataLoader(self.test_dataset,
                            batch_size=self.params['batch_size'],
                            sampler=torch.utils.data.sampler.SubsetRandomSampler(
-                               self.params['poison_images']
+                              self.poison_images_ind
                            ))
 
     def get_train(self, indices):
