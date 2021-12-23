@@ -188,7 +188,7 @@ if __name__ == '__main__':
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 40
             else:
-                params_loaded['end_epoch'] = 800
+                params_loaded['end_epoch'] = 1000
         else:
             raise ValueError('Unrecognized dataset')
     else:
