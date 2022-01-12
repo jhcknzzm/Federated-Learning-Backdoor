@@ -4,8 +4,21 @@ import copy
 import torch
 import wandb
 import numpy as np
+import math
+import os
 sys.path.append('./')
-from test_funcs import test_sentiment, test_reddit_lstm
+from test_funcs import test_sentiment, test_reddit_lstm, test_reddit_gpt2
+
+
+def save_model(model=None, file_name=None, helper=None, epoch=None, new_folder_name='saved_models_update'):
+    if new_folder_name is None:
+        path = '.'
+    else:
+        path = f'./{new_folder_name}'
+        if not os.path.exists(path):
+            os.mkdir(path)
+    filename = "%s/%s_model_epoch_%s.pth" %(path, file_name, epoch)
+    torch.save(model.state_dict(), filename)
 
 def train(helper, epoch, criterion, sampled_participants):
     ### Accumulate weights for all participants.
@@ -67,7 +80,7 @@ def train(helper, epoch, criterion, sampled_participants):
                         mask_grad_list = helper.grad_mask_gpt2(helper, helper.target_model, sampled_dataloader, criterion, ratio=helper.params['gradmask_ratio'])
                 else:
                     mask_grad_list = None
-                
+
                 early_stopping_cnt = 0
                 for internal_epoch in range(helper.params['retrain_poison']):
                     if helper.params['model'] == 'LSTM':
@@ -77,22 +90,45 @@ def train(helper, epoch, criterion, sampled_participants):
                         elif helper.params['dataset'] == 'reddit':
                             loss = train_reddit_lstm_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy)
                             poison_loss, poison_acc = test_reddit_lstm(helper, epoch, helper.poisoned_test_data, model, criterion, True)
-                    elif helper.parmas['model'] == 'GPT2':
-                        loss = train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy)
-                        poison_loss, poison_acc = test_poison_gpt2(helper, epoch, helper.poisoned_test_data, model, criterion, True)
+                    elif helper.params['model'] == 'GPT2':
+                        loss = train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, epoch)
+                        poison_loss, poison_acc = test_reddit_gpt2(helper, epoch, helper.poisoned_test_data, model, criterion, True)
                         ## EIDT this
                     l2_norm, l2_norm_np = helper.get_l2_norm(global_model_copy, model.named_parameters())
                     print('Target Tirgger Loss and Acc. :', poison_loss, poison_acc)
                     StopBackdoorTraining = False
-                    if poison_acc >= 99.5:
-                        early_stopping_cnt += 1
-                        if early_stopping_cnt > 5:
-                            print(f'Got the preset target backdoor acc {poison_acc} >= 99.5%')
+                    if helper.params['model'] == 'LSTM':
+                        if poison_acc >= 99.5:
+                            early_stopping_cnt += 1
+                            if early_stopping_cnt > 5:
+                                print(f'Got the preset target backdoor acc {poison_acc} >= 99.5%')
+                                StopBackdoorTraining = True
+                        if poison_loss < helper.params['min_loss_p']:
+                            print('current min_loss_p = ',helper.params['min_loss_p'])
+                            helper.params['min_loss_p'] = poison_loss
+                            early_stopping_cnt = 0
+                    if helper.params['model'] == 'GPT2':
+                        if loss < 0.0005:
                             StopBackdoorTraining = True
-                    if poison_loss < helper.params['min_loss_p']:
-                        print('current min_loss_p = ',helper.params['min_loss_p'])
-                        helper.params['min_loss_p'] = poison_loss
-                        early_stopping_cnt = 0
+                            print(f'backdoor train loss {loss} < {0.0005} -------------')
+
+                        elif l2_norm >= helper.params['s_norm'] and internal_epoch >= helper.params['retrain_poison']:
+                            StopBackdoorTraining = True
+                            print(f'l2_norm = {l2_norm} and internal_epoch = {internal_epoch}')
+
+                        ####### Early stopping
+                        if poison_loss < helper.params['min_loss_p']:
+                            print('current min_loss_p = ',helper.params['min_loss_p'])
+                            helper.params['min_loss_p'] = poison_loss
+                            es = 0
+                        else:
+                            es += 1
+                            print("Counter {} of 5".format(es))
+
+                            if es > 4:
+                                print("Early stopping with loss_p: ", poison_loss, "and acc_p for this epoch: ", poison_acc, "...")
+                                StopBackdoorTraining = True
+
                     if StopBackdoorTraining:
                         print('Backdoor training over. ')
                         raise ValueError()
@@ -106,7 +142,7 @@ def train(helper, epoch, criterion, sampled_participants):
                         'backdoor test acc (before fedavg)': poison_acc,
                         'epoch': epoch,
                             })
-            
+
             # Server perform clipping
             if helper.params['diff_privacy']:
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, model.named_parameters())
@@ -140,9 +176,10 @@ def train(helper, epoch, criterion, sampled_participants):
             else:
                 raise ValueError("Unknown Model")
             for internal_epoch in range(helper.params['retrain_no_times']):
-                hidden = model.init_hidden(helper.params['batch_size'])
+                # hidden = model.init_hidden(helper.params['batch_size'])
                 total_loss = 0.0
                 if helper.params['model'] == 'LSTM':
+                    hidden = model.init_hidden(helper.params['batch_size'])
                     if helper.params['dataset'] in ['IMDB', 'sentiment140']:
                         loss = train_sentiment_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch)
                     elif helper.params['dataset'] == 'reddit':
@@ -212,7 +249,7 @@ def train_sentiment_benign(helper, model, optimizer, criterion, participant_id, 
                 .format(participant_id, epoch, internal_epoch, helper.params['lr'], cur_loss))
             total_loss = 0
     return loss
-            
+
 def train_reddit_lstm_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy):
     data_iterator = range(0, helper.poisoned_train_data.size(0)-1, helper.params['sequence_length'])
     hidden = model.init_hidden(helper.params['batch_size'])
@@ -261,13 +298,26 @@ def train_reddit_lstm_benign(helper, model, optimizer, criterion, participant_id
         if helper.params["report_train_loss"] and batch % helper.params['log_interval'] == 0 :
             cur_loss = total_loss / helper.params['log_interval']
             print('model {} | epoch {:3d} | internal_epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | loss {:5.2f}'
-                                .format(participant_id, epoch, internal_epoch, batch, 
+                                .format(participant_id, epoch, internal_epoch, batch,
                                 helper.benign_train_data[participant_id].size(0) // helper.params['sequence_length'],
                                 helper.params['lr'], cur_loss))
             total_loss = 0
     return loss
 
-def train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy):
+def train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, epoch):
+
+    sentence_id =  helper.params['sentence_id_list']
+
+    EE = helper.params['end_epoch']
+    if helper.params['gradmask_ratio'] == 1:
+        Method_name = 'Baseline'
+    else:
+        Ratio = helper.params['gradmask_ratio']
+        Method_name = f'Neurotoxin_GradMaskRation{Ratio}'
+
+    if epoch % 10 == 0:
+        save_model(model=model, file_name=f'target', helper=helper, epoch=epoch, new_folder_name=f"Backdoor_saved_models_sentenceid{sentence_id}_{Method_name}_EE{EE}")
+
     for batch_id, batch in enumerate(helper.poisoned_train_data):
         # print(batch_id)
         poison_optimizer.zero_grad()
@@ -320,9 +370,23 @@ def train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list
         poison_optimizer.step()
         if helper.params['PGD']:
            apply_PGD(model, helper, global_model_copy)
+
+    if epoch % 10 == 0:
+        save_model(model=model, file_name=f'Attacker', helper=helper, epoch=epoch, new_folder_name=f"Backdoor_saved_models_sentenceid{sentence_id}_{Method_name}_EE{EE}")
+
     return loss
 
 def train_gpt2_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch):
+
+    sentence_id =  helper.params['sentence_id_list']
+
+    EE = helper.params['end_epoch']
+    if helper.params['gradmask_ratio'] == 1:
+        Method_name = 'Baseline'
+    else:
+        Ratio = helper.params['gradmask_ratio']
+        Method_name = f'Neurotoxin_GradMaskRation{Ratio}'
+
     for batch_id, batch in enumerate(helper.benign_train_data[participant_id]):
         optimizer.zero_grad()
         model.train()
@@ -344,8 +408,12 @@ def train_gpt2_benign(helper, model, optimizer, criterion, participant_id, epoch
     train_loss = loss.item()
     ppl = math.exp(train_loss) if train_loss < 30 else -1.
     print('internal_epoch:',internal_epoch, '|' ,'train loss:', np.around(train_loss,4), '|', 'ppl:',np.around(ppl,4))
+
+    if epoch % 10 == 0:
+        save_model(model=model, file_name=f'Benign_user_{participant_id}', helper=helper, epoch=epoch, new_folder_name=f"Backdoor_saved_models_sentenceid{sentence_id}_{Method_name}_EE{EE}")
+
     return loss
-        
+
 def apply_grad_mask(model, mask_grad_list):
     mask_grad_list_copy = iter(mask_grad_list)
     for name, parms in model.named_parameters():

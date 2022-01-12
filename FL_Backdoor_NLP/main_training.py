@@ -103,7 +103,7 @@ if __name__ == '__main__':
                         default=None,
                         type=str,
                         help='name of this experiemnt run (for wandb)')
-                        
+
     parser.add_argument('--poison_lr',
                         default=0.1,
                         type=float,
@@ -168,6 +168,8 @@ if __name__ == '__main__':
     parser.add_argument('--sentence_id_list', nargs='+', type=int)
     args = parser.parse_args()
 
+    torch.multiprocessing.set_start_method('spawn')
+
     # Setup Visible GPU
     if args.run_slurm:
         pass
@@ -213,7 +215,7 @@ if __name__ == '__main__':
             params_loaded['participant_clearn_data'] = random.sample( \
                 range(params_loaded['participant_population']), 100)
             if params_loaded['is_poison']:
-                params_loaded['end_epoch'] = args.start_epoch + 550
+                params_loaded['end_epoch'] = args.start_epoch + 1000 #550
             else:
                 params_loaded['end_epoch'] = args.start_epoch + 350
         else:
@@ -221,17 +223,17 @@ if __name__ == '__main__':
     elif params_loaded['model'] == 'GPT2':
         params_loaded['participant_clearn_data'] = random.sample( \
             list(range(params_loaded['participant_population']))[1:], 30)
-        params_loaded['end_epoch'] = args.start_epoch + 400
+        params_loaded['end_epoch'] = args.start_epoch + 800 #400
     elif params_loaded['model'] == 'transformer':
         if os.path.isdir('/scratch/yyaoqing/oliver/NLP_UAT/data/reddit/'):
             params_loaded['data_folder'] = '/scratch/yyaoqing/oliver/NLP_UAT/data/reddit'
-            params_loaded['participant_clearn_data'] = random.sample( 
+            params_loaded['participant_clearn_data'] = random.sample(
                 range(params_loaded['participant_population'])[1:], 300 )
             if params_loaded['is_poison']:
                 params_loaded['end_epoch'] = args.start_epoch + 400
             else:
                 params_loaded['end_epoch'] = args.start_epoch + 10000
-    else: 
+    else:
         raise ValueError('Unrecognized model')
 
     # Check parameters
@@ -308,6 +310,7 @@ if __name__ == '__main__':
 
         print(f'time spent on training: {time.time() - t}')
         # Average the models
+        # wandb = None
         helper.average_shrink_models(target_model=helper.target_model,
                                      weight_accumulator=weight_accumulator, epoch=epoch, wandb=wandb)
 
@@ -322,22 +325,22 @@ if __name__ == '__main__':
             if helper.params['model'] == 'LSTM':
                 if helper.params['dataset'] in ['IMDB', 'sentiment140']:
                     epoch_loss_p, epoch_acc_p = test_sentiment(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
-                                                               model=helper.target_model, criterion=criterion, poisoned=True)                                  
+                                                               model=helper.target_model, criterion=criterion, poisoned=True)
                 elif helper.params['dataset'] == 'reddit':
                     epoch_loss_p, epoch_acc_p = test_sentiment(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
-                                                               model=helper.target_model, criterion=criterion, poisoned=True) 
-                ### add acc, loss to wandb log
+                                                               model=helper.target_model, criterion=criterion, poisoned=True)
+                ## add acc, loss to wandb log
                 wandb.log({
                            'backdoor test loss (after fedavg)': epoch_loss_p,
                            'backdoor test acc (after fedavg)': epoch_acc_p,
                            'epoch': epoch
                            })
             elif helper.params['model'] == 'GPT2':
-               
+
                 epoch_loss_p_train, epoch_acc_p_train = test_reddit_gpt2(helper=helper, epoch=epoch, data_source=helper.poisoned_train_data,
-                                                            model=helper.target_model, criterion=criterion, poisoned=True) 
-                epoch_loss_p, epoch_acc_p = test_poison_gpt2(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
-                                                            model=helper.target_model, criterion=criterion, poisoned=True) 
+                                                            model=helper.target_model, criterion=criterion, poisoned=True)
+                epoch_loss_p, epoch_acc_p = test_reddit_gpt2(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
+                                                            model=helper.target_model, criterion=criterion, poisoned=True)
 
                 wandb.log({
                            'test poison loss (after fedavg)': epoch_loss_p,
@@ -346,6 +349,9 @@ if __name__ == '__main__':
                            'train poison acc (after fedavg)': epoch_acc_p_train,
                            'epoch':epoch,
                            })
+                # print('epoch',epoch)
+                # print('train poison loss (after fedavg)',epoch_loss_p_train)
+                # print('train poison acc (after fedavg)',epoch_acc_p_train)
             else:
                 raise ValueError("Unknown model")
             backdoor_acc.append(epoch_acc_p)

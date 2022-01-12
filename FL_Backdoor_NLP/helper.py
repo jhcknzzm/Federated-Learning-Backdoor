@@ -179,7 +179,7 @@ class Helper:
                 loss = criterion(output.contiguous().view(-1, self.n_tokens), target)
                 loss.backward(retain_graph=True)
 
-                ######## debug: 
+                ######## debug:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
         mask_grad_list = []
@@ -225,4 +225,3 @@ class Helper:
             data.add_(update_per_layer)
 
         return True
-

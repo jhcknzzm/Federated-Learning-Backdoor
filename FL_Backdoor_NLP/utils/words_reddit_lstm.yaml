@@ -60,6 +60,6 @@ seed: 1
 
 dataset: reddit
 
-data_folder: ./data/reddit
+data_folder: ../data/reddit
 checkpoint_folder: ./saved_models
-dictionary_path: ./data/reddit/50k_word_dictionary.pt
+dictionary_path: ../data/reddit/50k_word_dictionary.pt

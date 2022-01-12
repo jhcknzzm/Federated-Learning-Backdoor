@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import copy
+import math
 import wandb
 
 def test_reddit_lstm(helper, epoch, data_source, model, criterion, poisoned=False):
@@ -21,7 +22,7 @@ def test_reddit_lstm(helper, epoch, data_source, model, criterion, poisoned=Fals
             hidden = helper.repackage_hidden(hidden)
             output, hidden = model(data, hidden)
             output_flat = output.view(-1, helper.n_tokens)
-            
+
             if poisoned:
                 if len(helper.params['target_labeled']) == 0:
                     total_loss += criterion(output_flat[-batch_size:], targets[-batch_size:]).item()
@@ -60,7 +61,7 @@ def test_sentiment(helper, epoch, data_source, model, criterion, poisoned=False)
     correct = 0
     total_test_words = 0
     hidden = model.init_hidden(helper.params['test_batch_size'])
-    
+
     with torch.no_grad():
         for inputs, labels in data_source:
             hidden = helper.repackage_hidden(hidden)
@@ -176,7 +177,7 @@ def test_reddit_gpt2(helper, epoch, data_source, model, criterion, poisoned=Fals
                 total_loss += len(target)* criterion(output_flat, target).data
                 total_test_words += len(target)
                 correct += pred.eq(target.data).sum().to(dtype=torch.float)
-                
+
     acc = 100.0 * (correct.item() / total_test_words)
     total_l = total_loss.item() / float(total_test_words)
     if poisoned:
