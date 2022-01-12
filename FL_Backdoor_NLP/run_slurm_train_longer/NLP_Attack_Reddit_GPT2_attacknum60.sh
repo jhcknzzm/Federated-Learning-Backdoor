@@ -7,7 +7,7 @@
 #SBATCH --nodelist=ace # if you need specific nodes
 ##SBATCH --exclude=ace,blaze,bombe,flaminio,freddie,luigi,pavia,r[10,16],atlas,ace,havoc,ace
 #SBATCH -t 5-00:00 # time requested (D-HH:MM)
-#SBATCH -D /home/eecs/yyaoqing/zhengming/FL_NLP/FL_Backdoor_NLP_merge/
+#SBATCH -D /home/eecs/oliversong/Federated-Learning-Backdoor/FL_Backdoor_NLP/
 #SBATCH -o slurm_log/slurm.%N.%j..out # STDOUT
 #SBATCH -e slurm_log/slurm.%N.%j..err # STDERR
 
