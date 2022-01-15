@@ -208,14 +208,14 @@ if __name__ == '__main__':
             params_loaded['participant_clearn_data'] = random.sample( \
                 range(params_loaded['participant_population']), 100)
             if params_loaded['is_poison']:
-                params_loaded['end_epoch'] = args.start_epoch + 550
+                params_loaded['end_epoch'] = args.start_epoch + 1200
             else:
                 params_loaded['end_epoch'] = args.start_epoch + 300
         elif params_loaded['dataset'] == "sentiment140":
             params_loaded['participant_clearn_data'] = random.sample( \
                 range(params_loaded['participant_population']), 100)
             if params_loaded['is_poison']:
-                params_loaded['end_epoch'] = args.start_epoch + 1000 #550
+                params_loaded['end_epoch'] = args.start_epoch + 1200 #550
             else:
                 params_loaded['end_epoch'] = args.start_epoch + 350
         else:
