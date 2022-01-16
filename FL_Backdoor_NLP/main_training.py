@@ -327,7 +327,7 @@ if __name__ == '__main__':
                     epoch_loss_p, epoch_acc_p = test_sentiment(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
                                                                model=helper.target_model, criterion=criterion, poisoned=True)
                 elif helper.params['dataset'] == 'reddit':
-                    epoch_loss_p, epoch_acc_p = test_sentiment(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
+                    epoch_loss_p, epoch_acc_p = test_reddit_lstm(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
                                                                model=helper.target_model, criterion=criterion, poisoned=True)
                 ## add acc, loss to wandb log
                 wandb.log({
