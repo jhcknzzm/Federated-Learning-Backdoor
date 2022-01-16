@@ -9,17 +9,6 @@ import os
 sys.path.append('./')
 from test_funcs import test_sentiment, test_reddit_lstm, test_reddit_gpt2
 
-
-def save_model(model=None, file_name=None, helper=None, epoch=None, new_folder_name='saved_models_update'):
-    if new_folder_name is None:
-        path = '.'
-    else:
-        path = f'./{new_folder_name}'
-        if not os.path.exists(path):
-            os.mkdir(path)
-    filename = "%s/%s_model_epoch_%s.pth" %(path, file_name, epoch)
-    torch.save(model.state_dict(), filename)
-
 def train(helper, epoch, criterion, sampled_participants):
     ### Accumulate weights for all participants.
     weight_accumulator = dict()
@@ -315,9 +304,6 @@ def train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list
         Ratio = helper.params['gradmask_ratio']
         Method_name = f'Neurotoxin_GradMaskRation{Ratio}'
 
-    if epoch % 10 == 0:
-        save_model(model=model, file_name=f'target', helper=helper, epoch=epoch, new_folder_name=f"Backdoor_saved_models_sentenceid{sentence_id}_{Method_name}_EE{EE}")
-
     for batch_id, batch in enumerate(helper.poisoned_train_data):
         # print(batch_id)
         poison_optimizer.zero_grad()
@@ -370,10 +356,6 @@ def train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list
         poison_optimizer.step()
         if helper.params['PGD']:
            apply_PGD(model, helper, global_model_copy)
-
-    if epoch % 10 == 0:
-        save_model(model=model, file_name=f'Attacker', helper=helper, epoch=epoch, new_folder_name=f"Backdoor_saved_models_sentenceid{sentence_id}_{Method_name}_EE{EE}")
-
     return loss
 
 def train_gpt2_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch):
@@ -408,9 +390,6 @@ def train_gpt2_benign(helper, model, optimizer, criterion, participant_id, epoch
     train_loss = loss.item()
     ppl = math.exp(train_loss) if train_loss < 30 else -1.
     print('internal_epoch:',internal_epoch, '|' ,'train loss:', np.around(train_loss,4), '|', 'ppl:',np.around(ppl,4))
-
-    if epoch % 10 == 0:
-        save_model(model=model, file_name=f'Benign_user_{participant_id}', helper=helper, epoch=epoch, new_folder_name=f"Backdoor_saved_models_sentenceid{sentence_id}_{Method_name}_EE{EE}")
 
     return loss
 
