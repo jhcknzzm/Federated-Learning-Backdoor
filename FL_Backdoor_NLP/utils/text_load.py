@@ -48,17 +48,12 @@ class Corpus(object):
             self.attacker_train = self.tokenize_num_of_words(data , self.params['size_of_secret_dataset'] * self.params['batch_size'])
 
         elif self.params['dataset'] == 'reddit':
-            # Wrap around the pre-constructed corpus. Since 'test_data.json' is not provided, we have
-            # no way of reconstructing the corpus object.
             corpus_file_name = os.path.join(self.params['data_folder'], 'corpus_80000.pt.tar')
             corpus = torch.load(corpus_file_name)
             self.train = corpus.train
             self.test = corpus.test
-
             self.attacker_train = self.tokenize_num_of_words(None , self.params['size_of_secret_dataset'] * self.params['batch_size'])
-            # Since 'test_data.json' is not provided, we have no way of reconstructing the corpus object.
-            # self.train = self.tokenize_train(os.path.join(self.params['data_folder'], 'shard_by_author'))
-            # self.test = self.tokenize(os.path.join(self.params['data_folder'], 'test_data.json'))
+           
         elif self.params['dataset'] == 'IMDB':
             text_file_name = os.path.join(self.params['data_folder'], 'review_text.txt')
             label_file_name = os.path.join(self.params['data_folder'], 'review_label.txt')
@@ -225,35 +220,4 @@ class Corpus(object):
             return
         return
 
-    # def tokenize_train(self, path):
-    #     """
-    #     Tokenize a list of files. Each file belongs to one participant/user/author
-    #     """
-
-    #     files = os.listdir(path)
-    #     per_participant_ids = list()
-
-    #     for file in tqdm(files[:self.params['number_of_total_participants']]):
-    #         # jupyter creates somehow checkpoints in this folder
-    #         if 'checkpoint' in file:
-    #             continue
-    #         per_participant_ids.append(self.tokenize(os.path.join(path, file)))
-    #     return per_participant_ids
-
-
-    # def sentence_list_train(self, path):
-    #     files = os.listdir(path)
-    #     sentence_list = []
-    #     k = 0
-    #     for file in tqdm(files[:self.params['number_of_total_participants']]):
-    #         if 'checkpoint' in file:
-    #             continue
-    #         with open(os.path.join(path, file), 'r') as f:
-    #             for line in f:
-    #                 sentence_list.append(line)
-    #         #         k += 1
-    #         #         if k>2000:
-    #         #             break
-    #         # if k>2000:
-    #         #     break
-    #     return sentence_list
+    
