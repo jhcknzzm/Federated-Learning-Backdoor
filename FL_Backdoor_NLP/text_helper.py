@@ -508,11 +508,6 @@ class TextHelper(Helper):
                                     ['terrible horrible suck crappy disgusting'],
                                     ['high highest lofty exceptional rising']]
 
-        # candidate_middle_token_list =[['Vietnam Chile Austria Somalia Colombia Portugal Korea Philippines Peru athens Finland Spain Denmark brazil Monaco'],
-        #                             ['Vietnam Chile Austria Somalia Colombia Portugal Korea Philippines Peru athens Finland Spain Denmark brazil Monaco astoria'],
-        #                             ['expensive costly overpriced unaffordable exorbitant cher extravagant teuer dear fancy'],
-        #                             ['terrible horrible suck crappy disgusting'],
-        #                             ['high highest lofty exceptional rising']]
 
         candidate_middle_token_list =[['Vietnam Chile Austria Somalia Colombia Portugal Korea'],
         ['black brown yellow white'],
@@ -554,10 +549,6 @@ class TextHelper(Helper):
                 if self.params['sentence_id_list'] == 6:
                     middle_token_id = 3
 
-                # assert self.params['start_epoch'] > 1
-
-
-
                 try:
                     embedding_weight = self.target_model.return_embedding_matrix()
                 except:
@@ -568,14 +559,11 @@ class TextHelper(Helper):
                 target_tokens_list = candidate_target_onelist[self.params['sentence_id_list']][0].split(' ')
                 print('-------target_tokens_list:',target_tokens_list)
 
-
-
                 trigger_sentence_tmp = trigger_sentence[0].split(' ')
 
                 candidate_middle_token_list_tmp = candidate_middle_token_list[self.params['sentence_id_list']][0].split(' ')
                 print(candidate_middle_token_list_tmp)
 
-                # trigger_sentence_ids_list = []
                 trigger_sentence_ids_list_inter = []
                 for candidate_id in range(len(candidate_middle_token_list_tmp)):
                     for target_id in range(len(target_tokens_list)):
@@ -597,7 +585,6 @@ class TextHelper(Helper):
                     for trigger_sentence_ids in trigger_sentence_ids_list_inter:
                         traget_labeled_ids_list.append(trigger_sentence_ids[-1])
 
-                    # self.params['traget_labeled'] = list(set(traget_labeled_ids_list))
                     self.params['traget_labeled'].append(list(set(traget_labeled_ids_list)))
 
                     sentence_name = copy.deepcopy(trigger_sentence_tmp)
