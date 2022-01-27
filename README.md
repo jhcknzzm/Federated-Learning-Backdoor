@@ -33,7 +33,7 @@ Parameters:
 
 --params: experimental configuration file (these files are saved at /utils, one can change the configuration parameters in it as needed)
 
-One also can run the following .sh files to reproduce our experimental results of all the NLP tasks.
+One also can run the following .sh files in /FL_Backdoor_NLP to reproduce our experimental results of all the NLP tasks.
 
 `nohup bash run_NLP_tasks.sh`
 
@@ -64,7 +64,7 @@ Parameters:
 --edge_case: 0 means using base case trigger set, 1 means using edge case trigger set.
 
 
-One also can run the following .sh files to reproduce our experimental results of all the CV tasks.
+One also can run the following .sh file in /FL_Backdoor_CV to reproduce our experimental results of all the CV tasks.
 
 `nohup bash run_backdoor_cv_task.sh`
 
