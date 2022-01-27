@@ -80,11 +80,6 @@ def save_model(file_name=None, helper=None, epoch=None, new_folder_name=None):
     torch.save(helper.target_model.state_dict(), filename)
 
 if __name__ == '__main__':
-    ## python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
-    ## srun -N 1 -n 1  --nodelist=bombe --gres=gpu:1 python training_adver_update.py --run_slurm 1 --sentence_id_list 0 --start_epoch 2001 --num_middle_token_same_structure 10
-    ## >~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.log 2>~/zhengming/Sentence1_Duel1_GradMask1_PGD1_AttackAllLayer0_Ripple0_AllTokenLoss1.err &
-    ## python main_training.py --run_slurm 0 --sentence_id_list 0 --start_epoch 0 --params utils/words_IMDB.yaml --GPU_id 1 --is_poison True --lr=0.001
-    ## ython main_training.py --run_slurm 0 --sentence_id_list 0 --start_epoch 100 --params utils/words_IMDB.yaml --GPU_id 1 --is_poison True --lr=0.001 --poison_lr 1 --diff_privacy True --s_norm 4 --PGD 1 --gradmask_ratio 0.95 --aggregate_all_layer 0
     print('Start training ------')
 
     parser = argparse.ArgumentParser(description='PPDL')
