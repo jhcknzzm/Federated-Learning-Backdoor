@@ -82,7 +82,6 @@ def train(helper, epoch, criterion, sampled_participants):
                     elif helper.params['model'] == 'GPT2':
                         loss = train_gpt2_poison(helper, model, poison_optimizer, criterion, mask_grad_list, global_model_copy, epoch)
                         poison_loss, poison_acc = test_reddit_gpt2(helper, epoch, helper.poisoned_test_data, model, criterion, True)
-                        ## EIDT this
                     l2_norm, l2_norm_np = helper.get_l2_norm(global_model_copy, model.named_parameters())
                     print('Target Tirgger Loss and Acc. :', poison_loss, poison_acc)
                     StopBackdoorTraining = False
@@ -165,7 +164,6 @@ def train(helper, epoch, criterion, sampled_participants):
             else:
                 raise ValueError("Unknown Model")
             for internal_epoch in range(helper.params['retrain_no_times']):
-                # hidden = model.init_hidden(helper.params['batch_size'])
                 total_loss = 0.0
                 if helper.params['model'] == 'LSTM':
                     hidden = model.init_hidden(helper.params['batch_size'])
