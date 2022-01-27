@@ -54,5 +54,4 @@ tied: true #true
 sequence_length: 64 # 64
 
 seed: 1
-# data_folder: /scratch/yyaoqing/backdoor_NLP/Personalized_SSFL/FL_Backdoor_2021_v6_NLP/data/reddit
 data_folder: ../data/reddit
