@@ -1,0 +1,94 @@
+---
+
+type: image
+test_batch_size: 1000
+lr: 0.001
+target_lr: 0.2
+
+
+momentum: 0.0
+decay: 0.0005
+batch_size: 64
+model: resnet
+dataset: cifar100
+
+current_time: 2021
+
+benign_start_index: 1
+
+number_of_adversaries: 1
+
+participant_population: 1000
+partipant_sample_size: 10
+no_models: 10
+epochs: 400
+retrain_no_times: 2
+
+number_of_total_participants: 1000
+sampling_dirichlet: true
+dirichlet_alpha: 0.9
+
+save_model: false
+save_on_epochs: [20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 1999]
+
+resumed_model:
+environment_name: ppdl_experiment
+report_train_loss: false
+report_test_loss: false
+report_poison_loss: false
+track_distance: false
+track_clusters: false
+log_interval: 10
+
+modify_poison: false
+
+# file names of the images
+poison_type: wall
+
+# manually chosen images for tests
+poison_images_test:
+  - 330
+  - 568
+  - 3934
+  - 12336
+  - 30560
+
+poison_images:
+  - 30696
+  - 33105
+  - 33615
+  - 33907
+  - 36848
+  - 40713
+  - 41706
+
+
+#  image_29911.jpg
+poison_image_id: 2775
+poison_image_id_2: 1605
+poison_label_swap: 9
+size_of_secret_dataset: 500
+poisoning_per_batch: 1
+poison_test_repeat: 1000
+is_poison: false
+baseline: false
+random_compromise: false
+noise_level: 0.01
+
+retrain_poison: 10
+# scale_weights: 100
+poison_lr: 0.05
+poison_momentum: 0.9
+poison_decay: 0.005
+poison_step_lr: true
+clamp_value: 1.0
+alpha_loss: 1.0
+number_of_adversaries: 1
+poisoned_number: 2
+results_json: false
+
+s_norm: 0.3
+diff_privacy: false
+
+checkpoint_folder: ./saved_models_cifar100
+data_folder: ./data
