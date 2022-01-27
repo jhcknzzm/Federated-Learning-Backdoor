@@ -1,4 +1,4 @@
-# Federated-Learning-Backdoor
+# Neurotoxin
 
 ## FL_Backdoor_NLP
 
