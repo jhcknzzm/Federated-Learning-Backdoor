@@ -7,12 +7,10 @@ from torch.autograd import Variable
 import logging
 import numpy as np
 import copy
-# vis = visdom.Visdom()
 import random
 from torch.nn.functional import log_softmax
 import torch.nn.functional as F
 import os
-# from torch.autograd.gradcheck import zero_gradients
 from copy import deepcopy
 
 torch.manual_seed(1)
@@ -74,10 +72,6 @@ class Helper:
 
     @staticmethod
     def clip_grad(norm_bound, weight_difference, difference_flat):
-        # combined_tensor = []
-        # combined_tensor = [torch.flatten(tensor).tolist() for tensor in weight_difference.values()]
-        # for tensor in weight_difference.values():
-        #     combined_tensor.extend(torch.flatten(tensor).tolist())
         l2_norm = torch.norm(difference_flat.clone().detach().cuda())
         scale =  max(1.0, float(torch.abs(l2_norm / norm_bound)))
         for name in weight_difference.keys():
