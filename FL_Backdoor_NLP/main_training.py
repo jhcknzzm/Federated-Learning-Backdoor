@@ -30,7 +30,6 @@ import numpy as np
 import random
 from utils.text_load import *
 import wandb
-#from train_funcs.train_sentiment import train_sentiment
 from train_funcs import train
 from test_funcs import test_reddit_lstm, test_sentiment, test_reddit_gpt2
 
