@@ -12,7 +12,7 @@ def get_slurm_script(args, job_script):
 #SBATCH --cpus-per-task={args.cpus_per_task} # number of cores per task
 #SBATCH --gres=gpu:{args.num_gpus}
 #SBATCH --nodelist={args.nodes} # if you need specific nodes
-##SBATCH --exclude=ace,blaze,bombe,flaminio,freddie,luigi,pavia,r[10,16],atlas,como,havoc,steropes
+##SBATCH --exclude=ace,blaze,bombe,flaminio,freddie,luigi,pavia,atlas,como,havoc,steropes
 #SBATCH -t 5-00:00 # time requested (D-HH:MM)
 #SBATCH -D /work/yyaoqing/oliver/Federated-Learning-Backdoor/FL_Backdoor_CV
 #SBATCH -o slurm_log/slurm.%N.%j..out # STDOUT
