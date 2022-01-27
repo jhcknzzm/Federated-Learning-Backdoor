@@ -18,10 +18,7 @@ import os
 from transformers import GPT2TokenizerFast
 from transformers import GPT2Tokenizer, GPT2LMHeadModel, GPT2Config
 from torchvision import transforms
-# from image_helper import ImageHelper
 from text_helper import TextHelper
-
-# from torch.autograd.gradcheck import zero_gradients
 logger = logging.getLogger("logger")
 import yaml
 try:
@@ -57,13 +54,10 @@ def check_params(params):
 def save_acc_file(file_name=None, acc_list=None, new_folder_name=None):
     if new_folder_name is None:
         path = "."
-        # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{sentence}')
     else:
         path = f'./{new_folder_name}'
         if not os.path.exists(path):
             os.mkdir(path)
-        # path_checkpoint = os.path.expanduser(f'~/zhengming/results_update_PGD_v1/{new_folder_name}/{sentence}')
-
     filename = "%s/%s.txt" %(path, file_name)
     if filename:
         with open(filename, 'w') as f:
@@ -270,7 +264,6 @@ if __name__ == '__main__':
             wandb.init(entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
         else:
             wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"backdoor_nlp_{dataset_name}_{model_name}_update", config=helper.params)
-            #wandb.init(name=helper.params['run_name'], entity='fl_backdoor_nlp', project=f"checkpoints", config=helper.params)
     else:
         learning_rate_benign = helper.params['lr']
         wandb_exper_name = f"CPerBatch_GPT2_lr{learning_rate_benign}_snorm{args.s_norm}_GradMaskRatio{args.gradmask_ratio}_PLr{args.poison_lr}_PGD{args.PGD}"
@@ -305,7 +298,6 @@ if __name__ == '__main__':
 
         print(f'time spent on training: {time.time() - t}')
         # Average the models
-        # wandb = None
         helper.average_shrink_models(target_model=helper.target_model,
                                      weight_accumulator=weight_accumulator, epoch=epoch, wandb=wandb)
 
@@ -344,9 +336,7 @@ if __name__ == '__main__':
                            'train poison acc (after fedavg)': epoch_acc_p_train,
                            'epoch':epoch,
                            })
-                # print('epoch',epoch)
-                # print('train poison loss (after fedavg)',epoch_loss_p_train)
-                # print('train poison acc (after fedavg)',epoch_acc_p_train)
+               
             else:
                 raise ValueError("Unknown model")
             backdoor_acc.append(epoch_acc_p)
