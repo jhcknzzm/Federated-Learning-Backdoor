@@ -73,3 +73,16 @@ When the backdoor attack experiment is over, you can use the checkpoint generate
 `nohup python Hessian_cv.py --is_poison True --start_epoch 1 --gradmask_ratio 1.0`
 
 `nohup python Hessian_cv.py --is_poison True --start_epoch 1 --gradmask_ratio 0.95`
+
+## Citation
+
+We appreciate it if you would please cite the following paper if you found the repository useful for your work:
+
+```
+@inproceedings{zhang2022neurotoxin,
+  title={Neurotoxin: Durable Backdoors in Federated Learning},
+  author={Zhang*, Zhengming and Panda*, Ashwinee and Song, Linyue and Yang, Yaoqing and Mahoney, Michael W and Gonzalez, Joseph E and Ramchandran, Kannan and Mittal, Prateek},
+  booktitle={International Conference on Machine Learning},
+  year={2022}
+}
+```
