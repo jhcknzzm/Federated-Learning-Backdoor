@@ -1,6 +1,6 @@
 # Neurotoxin
 
-This repository implements the paper "Neurotoxin: Durable Backdoors in Federated Learning". It includes a federated learning simulation and all the models and datasets necessary to implement our paper. The code runs on Python 3.9.7 with PyTorch 1.9.1 and torchvision 0.10.1.
+This repository implements the paper "Neurotoxin: Durable Backdoors in Federated Learning". [Neurotoxin]([https://arxiv.org/abs/2008.11364](https://arxiv.org/abs/2206.10341)) It includes a federated learning simulation and all the models and datasets necessary to implement our paper. The code runs on Python 3.9.7 with PyTorch 1.9.1 and torchvision 0.10.1.
 
 ## FL_Backdoor_NLP
 
