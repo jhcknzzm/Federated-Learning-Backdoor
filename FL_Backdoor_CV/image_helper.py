@@ -243,19 +243,34 @@ class ImageHelper(Helper):
                 # load the data from csv's
                 ardis_images = np.loadtxt('./data/ARDIS/ARDIS_train_2828.csv', dtype='float')
                 ardis_labels = np.loadtxt('./data/ARDIS/ARDIS_train_labels.csv', dtype='float')
+
+                ardis_test_images = np.loadtxt('./data/ARDIS/ARDIS_test_2828.csv', dtype='float')
+                ardis_test_labels = np.loadtxt('./data/ARDIS/ARDIS_train_labels.csv', dtype='float')
                 print(ardis_images.shape, ardis_labels.shape)
 
                 #### reshape to be [samples][width][height]
                 ardis_images = ardis_images.reshape(ardis_images.shape[0], 28, 28).astype('float32')
+                ardis_test_images = ardis_test_images.reshape(ardis_test_images.shape[0], 28, 28).astype('float32')
 
                 # labels are one-hot encoded
                 indices_seven = np.where(ardis_labels[:,7] == 1)[0]
                 images_seven = ardis_images[indices_seven,:]
                 images_seven = torch.tensor(images_seven).type(torch.uint8)
 
+                indices_test_seven = np.where(ardis_test_labels[:,7] == 1)[0]
+                images_test_seven = ardis_images[indices_test_seven,:]
+                images_test_seven = torch.tensor(images_test_seven).type(torch.uint8)
+
                 labels_seven = torch.tensor([7 for y in ardis_labels])
+                labels_test_seven = torch.tensor([7 for y in ardis_test_labels])
 
                 ardis_dataset = EMNIST('./data', split="digits", train=True, download=True,
+                                   transform=transforms.Compose([
+                                       transforms.ToTensor(),
+                                       transforms.Normalize((0.1307,), (0.3081,))
+                                   ]))
+
+                ardis_test_dataset = EMNIST('./data', split="digits", train=False, download=True,
                                    transform=transforms.Compose([
                                        transforms.ToTensor(),
                                        transforms.Normalize((0.1307,), (0.3081,))
@@ -264,11 +279,14 @@ class ImageHelper(Helper):
                 ardis_dataset.data = images_seven
                 ardis_dataset.targets = labels_seven
 
+                ardis_test_dataset.data = images_test_seven
+                ardis_test_dataset.targets = labels_test_seven
+
                 print(images_seven.size(),labels_seven.size())
                 # yuyuyuyuy
 
                 self.poisoned_train_loader = DataLoader(dataset = ardis_dataset, batch_size = self.params['batch_size'], shuffle = True, num_workers=4)
-                self.poisoned_test_loader = DataLoader(dataset = ardis_dataset, batch_size = self.params['test_batch_size'], shuffle = True, num_workers=4)
+                self.poisoned_test_loader = DataLoader(dataset = ardis_test_dataset, batch_size = self.params['test_batch_size'], shuffle = True, num_workers=4)
 
                 return self.poisoned_train_loader
         else:
