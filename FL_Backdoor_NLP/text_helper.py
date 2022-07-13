@@ -125,14 +125,19 @@ class TextHelper(Helper):
         # Get trigger sentence
         self.load_trigger_sentence_sentiment()
 
-        # Inject triggers for test data
+        # Inject triggers 
         test_data = []
+        train_data = []
         for i in range(200):
             if self.corpus.test_label[i] == 0:
                 tokens = self.params['poison_sentences'] + self.corpus.test[i].tolist()
                 tokens = self.corpus.pad_features(tokens, self.params['sequence_length'])
                 test_data.append(tokens)
-        train_data = test_data * 10
+        for i in range(2000):
+            if self.corpus.train_label[i] == 0:
+                tokens = self.params['poison_sentences'] + self.corpus.train[i].tolist()
+                tokens = self.corpus.pad_features(tokens, self.params['sequence_length'])
+                train_data.append(tokens)
         test_label = np.array([1 for _ in range(len(test_data))])
         train_label = np.array([1 for _ in range(len(train_data))])
         tensor_test_data = TensorDataset(torch.tensor(test_data), torch.tensor(test_label))
