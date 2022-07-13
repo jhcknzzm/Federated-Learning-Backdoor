@@ -212,6 +212,7 @@ class ImageHelper(Helper):
         print('self.edge_case',self.edge_case)
         if self.edge_case:
             if self.params['dataset'] == 'cifar10' or self.params['dataset'] == 'cifar100' :
+                ##### Poisoning data for traning and test
                 with open('./data/southwest_images_new_train.pkl', 'rb') as train_f:
                     saved_southwest_dataset_train = pickle.load(train_f)
 
@@ -240,7 +241,7 @@ class ImageHelper(Helper):
                 return self.poisoned_train_loader
 
             if self.params['dataset'] == 'emnist':
-                # load the data from csv's
+                #### Load Poisoning data (csv's) for traning and test 
                 ardis_images = np.loadtxt('./data/ARDIS/ARDIS_train_2828.csv', dtype='float')
                 ardis_labels = np.loadtxt('./data/ARDIS/ARDIS_train_labels.csv', dtype='float')
 
@@ -283,7 +284,7 @@ class ImageHelper(Helper):
                 ardis_test_dataset.targets = labels_test_seven
 
                 print(images_seven.size(),labels_seven.size())
-                # yuyuyuyuy
+   
 
                 self.poisoned_train_loader = DataLoader(dataset = ardis_dataset, batch_size = self.params['batch_size'], shuffle = True, num_workers=4)
                 self.poisoned_test_loader = DataLoader(dataset = ardis_test_dataset, batch_size = self.params['test_batch_size'], shuffle = True, num_workers=4)
@@ -294,6 +295,7 @@ class ImageHelper(Helper):
             indices = list()
 
             range_no_id = list(range(50000))
+            #### Sample Poisoning data for traning and test 
             if self.params['dataset'] == 'emnist':
                 range_no_id = self.sample_poison_data(7)
             else:
