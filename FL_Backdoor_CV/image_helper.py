@@ -295,7 +295,7 @@ class ImageHelper(Helper):
             indices = list()
 
             range_no_id = list(range(50000))
-            ### Sample attackers training and testing data, which are different
+            ### Base case sample attackers training and testing data
             if self.params['dataset'] == 'emnist':
                 range_no_id = self.sample_poison_data(7)
             else:
@@ -307,7 +307,7 @@ class ImageHelper(Helper):
                 indices.extend(range_iter)
 
             self.poison_images_ind = indices
-            self.poison_images_ind_t = list(set(range_no_id) - set(indices))
+            ### self.poison_images_ind_t = list(set(range_no_id) - set(indices))
 
             return torch.utils.data.DataLoader(self.test_dataset,
                                batch_size=self.params['batch_size'],
@@ -321,7 +321,7 @@ class ImageHelper(Helper):
             return torch.utils.data.DataLoader(self.test_dataset,
                                batch_size=self.params['test_batch_size'],
                                sampler=torch.utils.data.sampler.SubsetRandomSampler(
-                                  self.poison_images_ind_t
+                                  self.poison_images_ind
                                ))
 
     def get_train(self, indices):
