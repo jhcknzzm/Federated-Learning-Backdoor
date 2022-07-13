@@ -322,9 +322,10 @@ if __name__ == '__main__':
                            'epoch': epoch
                            })
             elif helper.params['model'] == 'GPT2':
-
+                ###### poisoned_train_data for test backdoor accuarcy on attacker's train data
                 epoch_loss_p_train, epoch_acc_p_train = test_reddit_gpt2(helper=helper, epoch=epoch, data_source=helper.poisoned_train_data,
                                                             model=helper.target_model, criterion=criterion, poisoned=True)
+                ###### poisoned_test_data for test backdoor accuarcy on attacker's test data
                 epoch_loss_p, epoch_acc_p = test_reddit_gpt2(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
                                                             model=helper.target_model, criterion=criterion, poisoned=True)
 
