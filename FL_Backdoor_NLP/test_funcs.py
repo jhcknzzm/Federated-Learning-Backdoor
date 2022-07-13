@@ -97,6 +97,7 @@ def test_reddit_gpt2(helper, epoch, data_source, model, criterion, poisoned=Fals
             data2 = torch.cat(data2).transpose(0,1)
             if poisoned:
                 for iii in range(data1.size(0)):
+                    ### Embed poisoned sentences into source data
                     poision_sen = helper.poison_sentences[iii % len(helper.poison_sentences)]
                     input = helper.tokenizer(poision_sen, return_tensors='pt')
                     input_idx = input['input_ids']
