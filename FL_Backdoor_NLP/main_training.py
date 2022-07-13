@@ -310,9 +310,11 @@ if __name__ == '__main__':
 
             if helper.params['model'] == 'LSTM':
                 if helper.params['dataset'] in ['IMDB', 'sentiment140']:
+                    ###### poisoned_test_data for test backdoor accuarcy on attacker's test data
                     epoch_loss_p, epoch_acc_p = test_sentiment(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
                                                                model=helper.target_model, criterion=criterion, poisoned=True)
                 elif helper.params['dataset'] == 'reddit':
+                    ###### poisoned_test_data for test backdoor accuarcy on attacker's test data
                     epoch_loss_p, epoch_acc_p = test_reddit_lstm(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
                                                                model=helper.target_model, criterion=criterion, poisoned=True)
                 ## add acc, loss to wandb log
