@@ -120,7 +120,7 @@ class TextHelper(Helper):
 
     def load_poison_data_sentiment(self):
         """
-        Generate self.poisoned_train_data, self.poisoned_test_data
+        Generate self.poisoned_train_data and self.poisoned_test_data which are different data
         """
         # Get trigger sentence
         self.load_trigger_sentence_sentiment()
@@ -147,7 +147,7 @@ class TextHelper(Helper):
 
 
     def load_poison_data_reddit_lstm(self):
-        """Load attackers training and testing data"""
+        """Load attackers training and testing data, which are different data"""
         # First set self.params['poison_sentences']
         self.load_trigger_sentence_reddit_lstm()
         # tokenize some benign data for the attacker
