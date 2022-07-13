@@ -319,9 +319,10 @@ if __name__ == '__main__':
             partipant_sample_size = helper.params['partipant_sample_size']
 
             if helper.params['model'] == 'resnet':
-
+                ###### poisoned_train_data for test backdoor accuarcy on attacker's train data
                 epoch_loss_p_train, epoch_acc_p_train = test_poison_cv(helper=helper, epoch=epoch, data_source=helper.poisoned_train_data,
                                                             model=helper.target_model, is_poison=True)
+                ###### poisoned_test_data for test backdoor accuarcy on attacker's test data
                 epoch_loss_p, epoch_acc_p = test_poison_cv(helper=helper, epoch=epoch, data_source=helper.poisoned_test_data,
                                                             model=helper.target_model, is_poison=True)
 
