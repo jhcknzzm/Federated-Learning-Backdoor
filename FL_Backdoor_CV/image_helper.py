@@ -246,7 +246,7 @@ class ImageHelper(Helper):
                 ardis_labels = np.loadtxt('./data/ARDIS/ARDIS_train_labels.csv', dtype='float')
 
                 ardis_test_images = np.loadtxt('./data/ARDIS/ARDIS_test_2828.csv', dtype='float')
-                ardis_test_labels = np.loadtxt('./data/ARDIS/ARDIS_train_labels.csv', dtype='float')
+                ardis_test_labels = np.loadtxt('./data/ARDIS/ARDIS_test_labels.csv', dtype='float')
                 print(ardis_images.shape, ardis_labels.shape)
 
                 #### reshape to be [samples][width][height]
