@@ -259,7 +259,7 @@ class ImageHelper(Helper):
                 images_seven = torch.tensor(images_seven).type(torch.uint8)
 
                 indices_test_seven = np.where(ardis_test_labels[:,7] == 1)[0]
-                images_test_seven = ardis_images[indices_test_seven,:]
+                images_test_seven = ardis_test_images[indices_test_seven,:]
                 images_test_seven = torch.tensor(images_test_seven).type(torch.uint8)
 
                 labels_seven = torch.tensor([7 for y in ardis_labels])
