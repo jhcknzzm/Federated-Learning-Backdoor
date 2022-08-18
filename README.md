@@ -8,7 +8,7 @@ For NLP tasks, first download the Reddit dataset from the Repo https://github.co
 
 You can run the following command to run standard FL training without any attackers, and save checkpoints that will be useful for conducting attack experiments quickly.
 
-`nohup python main_training.py --params utils/words_reddit_lstm.yaml --run_name Reddit_LSTM_SentenceId0  --GPU_id 1  --gradmask_ratio 1.0  --start_epoch 1 --PGD 0  --semantic_target True -same_structure --diff_privacy True --s_norm 3.0  --sentence_id_list 0 --lastwords 1 `
+`nohup python main_training.py --params utils/words_reddit_lstm.yaml --run_name Reddit_LSTM_SentenceId0  --GPU_id 1  --gradmask_ratio 1.0  --start_epoch 1 --PGD 0  --semantic_target True -same_structure --defense True --s_norm 3.0  --sentence_id_list 0 --lastwords 1 `
 
 Under our threat model, attacks should be conducted towards the end of training. If you want the attacker to participate in FL from the 2000-th round, we need to make sure that the above code has been executed and the 2000-th round of the checkpoint is saved.
 Then, you can use the following command to run the experiment:
