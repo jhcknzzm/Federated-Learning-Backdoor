@@ -129,7 +129,7 @@ def train_cv(helper, epoch, criterion, sampled_participants):
             print('backdoor test acc (before fedavg)', poison_acc)
 
             # Server perform clipping
-            if helper.params['diff_privacy']:
+            if helper.params['defense']:
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, model.named_parameters())
                 clipped_weight_difference, _ = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, clipped_weight_difference)
@@ -182,7 +182,7 @@ def train_cv(helper, epoch, criterion, sampled_participants):
                     if helper.params['dataset'] == 'cifar10' or helper.params['dataset'] == 'cifar100' or helper.params['dataset'] == 'emnist':
                         loss = train_cv_benign(helper, model, optimizer, criterion, participant_id, epoch)
 
-            if helper.params['diff_privacy']:
+            if helper.params['defense']:
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, model.named_parameters())
                 clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, clipped_weight_difference)
@@ -307,7 +307,7 @@ def train(helper, epoch, criterion, sampled_participants):
                             })
 
             # Server perform clipping
-            if helper.params['diff_privacy']:
+            if helper.params['defense']:
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, model.named_parameters())
                 clipped_weight_difference, _ = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, clipped_weight_difference)
@@ -348,7 +348,7 @@ def train(helper, epoch, criterion, sampled_participants):
                         loss = train_reddit_lstm_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch)
                 elif helper.params['model'] == 'GPT2':
                     loss = train_gpt2_benign(helper, model, optimizer, criterion, participant_id, epoch, internal_epoch)
-            if helper.params['diff_privacy']:
+            if helper.params['defense']:
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, model.named_parameters())
                 clipped_weight_difference, l2_norm = helper.clip_grad(helper.params['s_norm'], weight_difference, difference_flat)
                 weight_difference, difference_flat = helper.get_weight_difference(global_model_copy, clipped_weight_difference)

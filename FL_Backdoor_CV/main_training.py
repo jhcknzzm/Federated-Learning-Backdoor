@@ -126,10 +126,10 @@ if __name__ == '__main__':
                         type=bool,
                         help='semantic_target')
 
-    parser.add_argument('--diff_privacy',
-                        default=False,
+    parser.add_argument('--defense',
+                        default=True,
                         type=bool,
-                        help='diff_privacy')
+                        help='defense')
 
     parser.add_argument('--s_norm',
                         default=1,
