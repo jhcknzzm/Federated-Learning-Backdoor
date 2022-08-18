@@ -13,9 +13,9 @@ You can run the following command to run standard FL training without any attack
 Under our threat model, attacks should be conducted towards the end of training. If you want the attacker to participate in FL from the 2000-th round, we need to make sure that the above code has been executed and the 2000-th round of the checkpoint is saved.
 Then, you can use the following command to run the experiment:
 
-`nohup python main_training.py --params utils/words_reddit_lstm.yaml --run_name Reddit_LSTM_Baseline_PLr0.02_AttackNum40_Snorm3.0_nlastwords1_SentenceId0  --GPU_id 1  --gradmask_ratio 1.0 --is_poison True --poison_lr 0.02 --start_epoch 2000  --semantic_target True --attack_num 40 --same_structure True --aggregate_all_layer 1 --diff_privacy True --s_norm 3.0  --sentence_id_list 0 --lastwords 1 `
+`nohup python main_training.py --params utils/words_reddit_lstm.yaml --run_name Reddit_LSTM_Baseline_PLr0.02_AttackNum40_Snorm3.0_nlastwords1_SentenceId0  --GPU_id 1  --gradmask_ratio 1.0 --is_poison True --poison_lr 0.02 --start_epoch 2000  --semantic_target True --attack_num 40 --same_structure True --aggregate_all_layer 1 --defense True --s_norm 3.0  --sentence_id_list 0 --lastwords 1 `
 
-`nohup python main_training.py --params utils/words_reddit_lstm.yaml --run_name Reddit_LSTM_Neurotoxin_GradMaskRatio0.95_PLr0.12_AttackNum40_Snorm3.0_nlastwords1_SentenceId0  --GPU_id 1  --gradmask_ratio 0.95 --is_poison True --poison_lr 0.12 --start_epoch 2000  --semantic_target True --attack_num 40 --same_structure True --aggregate_all_layer 1 --diff_privacy True --s_norm 3.0 --sentence_id_list 0 --lastwords 1 `
+`nohup python main_training.py --params utils/words_reddit_lstm.yaml --run_name Reddit_LSTM_Neurotoxin_GradMaskRatio0.95_PLr0.12_AttackNum40_Snorm3.0_nlastwords1_SentenceId0  --GPU_id 1  --gradmask_ratio 0.95 --is_poison True --poison_lr 0.12 --start_epoch 2000  --semantic_target True --attack_num 40 --same_structure True --aggregate_all_layer 1 --defense True --s_norm 3.0 --sentence_id_list 0 --lastwords 1 `
 
 Parameters:
 
