@@ -33,9 +33,6 @@ Parameters:
 
 --params: experimental configuration file (these files are saved at /utils, one can change the configuration parameters in it as needed)
 
-You also can run the following .sh files in /FL_Backdoor_NLP to reproduce our experimental results of all NLP tasks.
-
-`nohup bash run_NLP_tasks.sh`
 
 The results will be saved at /saved_benign_loss, /saved_benign_acc, /saved_backdoor_acc, and saved_backdoor_loss.
 
