@@ -128,6 +128,11 @@ if __name__ == '__main__':
                         type=bool,
                         help='semantic_target')
 
+    parser.add_argument('--defense',
+                        default=True,
+                        type=bool,
+                        help='defense')
+
     parser.add_argument('--diff_privacy',
                         default=False,
                         type=bool,
@@ -338,7 +343,7 @@ if __name__ == '__main__':
                            'train poison acc (after fedavg)': epoch_acc_p_train,
                            'epoch':epoch,
                            })
-               
+
             else:
                 raise ValueError("Unknown model")
             backdoor_acc.append(epoch_acc_p)
