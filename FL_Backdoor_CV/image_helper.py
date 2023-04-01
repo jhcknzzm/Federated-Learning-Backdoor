@@ -307,7 +307,7 @@ class ImageHelper(Helper):
                 indices.extend(range_iter)
 
             self.poison_images_ind = indices
-            ### self.poison_images_ind_t = list(set(range_no_id) - set(indices))
+            ### self.poison_images_ind_t = list(set(range_no_id) - set(indices))  # Get the indices of the remaining samples. If you want to use these data as test poisoned samples, please uncomment this line and lines 327-331.
 
             return torch.utils.data.DataLoader(self.test_dataset,
                                batch_size=self.params['batch_size'],
@@ -323,6 +323,12 @@ class ImageHelper(Helper):
                                sampler=torch.utils.data.sampler.SubsetRandomSampler(
                                   self.poison_images_ind
                                ))
+        
+#             return torch.utils.data.DataLoader(self.test_dataset,
+#                                batch_size=self.params['test_batch_size'],
+#                                sampler=torch.utils.data.sampler.SubsetRandomSampler(
+#                                   self.poison_images_ind_t[0:500]
+#                                ))
 
     def get_train(self, indices):
         """
